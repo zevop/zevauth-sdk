@@ -95,7 +95,7 @@ export class ZevAuth {
     this.organizations = new OrganizationsFlow(this.http, token, (id) =>
       this.setActiveOrganization(id),
     );
-    this.me = new UserFlow(this.http, token);
+    this.me = new UserFlow(this.http, token, (user) => this.replaceUser(user));
   }
 
   // ── Lifecycle ───────────────────────────────────────────────────
@@ -257,6 +257,30 @@ export class ZevAuth {
       expiresIn: response.session.expiresIn,
       user: response.user,
       organization: response.session.organization ?? null,
+    });
+    this.emit();
+  }
+
+  /**
+   * Swaps in a freshly-updated profile without touching the session.
+   *
+   * The tokens are untouched on purpose: a name change does not need new
+   * credentials, and minting them would mean a rotation — and a
+   * rotation for a profile edit is a refresh nobody asked for.
+   */
+  private replaceUser(user: ZevAuthUser): void {
+    const stored = this.tokens.readPersisted();
+    if (!stored) return;
+
+    this.tokens.write({
+      accessToken: this.tokens.getAccessToken() ?? '',
+      refreshToken: stored.refreshToken,
+      expiresIn: Math.max(
+        0,
+        Math.round((stored.expiresAt - Date.now()) / 1000),
+      ),
+      user,
+      organization: this.tokens.getOrganization(),
     });
     this.emit();
   }

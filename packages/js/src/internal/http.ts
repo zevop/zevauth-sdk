@@ -40,6 +40,14 @@ export class Http {
     return this.send<T>('POST', path, body, init);
   }
 
+  async patch<T>(
+    path: string,
+    body?: unknown,
+    init: { accessToken?: string | null } = {},
+  ): Promise<T> {
+    return this.send<T>('PATCH', path, body, init);
+  }
+
   async get<T>(
     path: string,
     init: { accessToken?: string | null } = {},

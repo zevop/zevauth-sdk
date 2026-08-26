@@ -1,0 +1,38 @@
+{
+  "name": "@zevauth/nextjs",
+  "version": "0.0.1",
+  "description": "ZevAuth for Next.js: middleware, server helpers and re-exported components.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },
+    "./server": {
+      "types": "./dist/server/index.d.ts",
+      "import": "./dist/server/index.js"
+    }
+  },
+  "files": ["dist"],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b",
+    "verify": "tsx scripts/verify.ts"
+  },
+  "peerDependencies": {
+    "next": ">=14",
+    "react": ">=18",
+    "react-dom": ">=18"
+  },
+  "dependencies": {
+    "@zevauth/js": "0.0.1",
+    "@zevauth/react": "0.0.1",
+    "jose": "^6.1.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.14",
+    "react": "^19.2.4",
+    "tsx": "^4.20.6",
+    "typescript": "~5.9.0"
+  }
+}
