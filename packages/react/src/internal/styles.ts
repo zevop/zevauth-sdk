@@ -60,17 +60,92 @@ const CSS = `
   --zv-error: #f87171;
 }
 
+/*
+ * ── Host isolation ────────────────────────────────────────────────
+ * Everything below states its own colour and spacing, at a specificity
+ * a host page is unlikely to beat.
+ *
+ * The rest of this stylesheet sets colour once on \`.zv-root\` and lets
+ * it inherit, which is tidy and wrong: inheritance is the WEAKEST source
+ * of a value, so any host rule that targets an element directly —
+ * \`h1 { color: … }\`, \`.prose strong { … }\`, a CMS theme, a CSS reset —
+ * beats it and paints inside our components. It surfaced as a sign-in
+ * heading rendered near-white on a white card, because the page around
+ * it happened to be in dark mode.
+ *
+ * Not styling bare elements protects the HOST's markup from ours. This
+ * is the other direction, and it needs saying explicitly.
+ *
+ * The doubled class is specificity, not a typo: \`.zv-root.zv-root .x\`
+ * scores above the two-class-plus-element selectors that frameworks
+ * generate, without resorting to \`!important\` — which would also block
+ * the developer's own \`className\`.
+ */
+.zv-root.zv-root :where(h1, h2, h3, p, ul, ol, li, figure) {
+  margin: 0;
+  padding: 0;
+}
+.zv-root.zv-root .zv-title { color: var(--zv-text); font-size: 16.5px; font-weight: 600; }
+.zv-root.zv-root .zv-subtitle { color: var(--zv-muted); font-size: 13px; }
+.zv-root.zv-root .zv-appname { color: var(--zv-muted); font-size: 12.5px; }
+.zv-root.zv-root .zv-label { color: var(--zv-text); font-size: 12.5px; font-weight: 500; }
+.zv-root.zv-root .zv-hint { color: var(--zv-muted); font-size: 11.5px; }
+.zv-root.zv-root .zv-fielderror { color: var(--zv-error); font-size: 11.5px; }
+.zv-root.zv-root .zv-divider { color: var(--zv-muted); font-size: 11.5px; }
+.zv-root.zv-root .zv-notice { color: var(--zv-muted); }
+.zv-root.zv-root .zv-alert { color: var(--zv-error); }
+.zv-root.zv-root .zv-testmode { color: var(--zv-muted); }
+.zv-root.zv-root .zv-menu-name { color: var(--zv-text); }
+.zv-root.zv-root .zv-menu-sub,
+.zv-root.zv-root .zv-menu-label { color: var(--zv-muted); }
+.zv-root.zv-root .zv-menu-item { color: var(--zv-text); }
+.zv-root.zv-root .zv-input { color: var(--zv-text); }
+.zv-root.zv-root .zv-button[data-variant='primary'] { color: var(--zv-on-accent); }
+.zv-root.zv-root .zv-button[data-variant='secondary'] { color: var(--zv-text); }
+.zv-root.zv-root .zv-button[data-variant='ghost'] { color: var(--zv-muted); }
+.zv-root.zv-root .zv-poweredby,
+.zv-root.zv-root .zv-poweredby strong {
+  color: var(--zv-muted);
+  text-decoration: none;
+  font-size: 11px;
+}
+.zv-root.zv-root .zv-poweredby strong { font-weight: 600; }
+
 .zv-card {
   display: flex;
   flex-direction: column;
   gap: 18px;
-  width: 100%;
-  max-width: 380px;
+  /*
+   * A stated width, capped on small screens.
+   *
+   * This was \`width: 100%; max-width: 380px\`, which reads as the same
+   * thing and is not. A percentage resolves against the parent, and
+   * \`.zv-root\` has no width of its own — so anywhere it becomes a
+   * flex or grid ITEM it shrinks to fit its content, the percentage
+   * resolves against that, and the card collapses into a tall thin
+   * column. It looked correct only because the common case puts it in a
+   * block container that happens to be wide.
+   *
+   * A fixed width does not depend on the parent at all, and
+   * \`max-width: 100%\` still keeps it inside a narrow one.
+   */
+  width: 380px;
+  max-width: 100%;
   padding: 28px 26px;
   background: var(--zv-surface);
   border: 1px solid var(--zv-border);
   border-radius: calc(var(--zv-radius) * 1.5);
 }
+
+/*
+ * A wider card, for the settings-style screens.
+ *
+ * A class rather than an inline \`maxWidth\`: with a stated \`width\` on
+ * the base rule, an inline max-width can only ever make a card
+ * narrower, so the two silently disagreed and the wide screens rendered
+ * at the narrow size.
+ */
+.zv-card[data-size='wide'] { width: 460px; }
 
 .zv-identity { display: flex; flex-direction: column; align-items: center; gap: 8px; }
 .zv-logo { max-height: 30px; max-width: 170px; object-fit: contain; }
@@ -95,9 +170,17 @@ const CSS = `
   transition: border-color .12s ease, box-shadow .12s ease;
 }
 .zv-input:focus-visible {
-  border-color: var(--zv-accent);
-  /* Focus is a ring, never a removed outline. */
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--zv-accent) 22%, transparent);
+  /*
+   * A ring, never a removed outline — but a QUIET one.
+   *
+   * This was a 3px halo plus a border darkened all the way to the
+   * accent. With a near-black accent that reads as a heavy double
+   * border, and the field looks broken rather than focused. 2px at a
+   * lower opacity, with the border only lifted to a mid tone, says the
+   * same thing without shouting it.
+   */
+  border-color: color-mix(in srgb, var(--zv-accent) 45%, var(--zv-border));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--zv-accent) 14%, transparent);
 }
 .zv-input[aria-invalid='true'] { border-color: var(--zv-error); }
 .zv-input:disabled { opacity: .55; cursor: not-allowed; }
@@ -122,7 +205,7 @@ const CSS = `
 }
 .zv-button:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--zv-accent) 30%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--zv-accent) 22%, transparent);
 }
 .zv-button:disabled { opacity: .55; cursor: not-allowed; }
 .zv-button[data-variant='primary'] { background: var(--zv-accent); color: var(--zv-on-accent); }
@@ -178,6 +261,44 @@ const CSS = `
   animation: zv-spin .6s linear infinite;
 }
 @keyframes zv-spin { to { transform: rotate(360deg); } }
+
+/* ── Collapsing sections ───────────────────────────────────────── */
+/*
+ * Animating \`grid-template-rows\` transitions to the content's real
+ * height. The usual \`max-height\` workaround needs a guess: guess low
+ * and tall content clips, guess high and most of the duration animates
+ * empty space, which reads as laggy.
+ */
+.zv-reveal {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition: grid-template-rows .25s ease, opacity .25s ease;
+}
+.zv-reveal[data-open='true'] { grid-template-rows: 1fr; opacity: 1; }
+/* \`min-height: 0\` is what lets a grid row actually collapse. */
+.zv-reveal > * { min-height: 0; overflow: hidden; }
+
+@media (prefers-reduced-motion: reduce) {
+  .zv-reveal { transition: none; }
+}
+
+.zv-more {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  width: 100%; padding: 6px; font: inherit; font-size: 12.5px;
+  color: var(--zv-muted); background: transparent; border: 0;
+  cursor: pointer; border-radius: var(--zv-radius);
+}
+.zv-more:hover { color: var(--zv-text); }
+.zv-more:focus-visible {
+  outline: none; box-shadow: 0 0 0 2px color-mix(in srgb, var(--zv-accent) 22%, transparent);
+}
+.zv-chevron { transition: transform .2s ease; }
+.zv-more[aria-expanded='true'] .zv-chevron { transform: rotate(180deg); }
+
+.zv-section-divider {
+  height: 1px; background: var(--zv-border); border: 0; margin: 2px 0;
+}
 
 /* ── Menus ─────────────────────────────────────────────────────── */
 .zv-menu-wrap { position: relative; display: inline-block; }

@@ -32,6 +32,10 @@ export {
 export { SignIn, type SignInProps } from './components/SignIn.js';
 export { SignUp, type SignUpProps } from './components/SignUp.js';
 export {
+  SignInWithZevId,
+  type SignInWithZevIdProps,
+} from './components/SignInWithZevId.js';
+export {
   UserProfile,
   type UserProfileProps,
 } from './components/UserProfile.js';

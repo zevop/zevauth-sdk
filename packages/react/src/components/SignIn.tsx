@@ -1,21 +1,42 @@
-import { useState, type FormEvent } from 'react';
-import { ZevAuthError } from '@zevauth/js';
-import { useZevAuthContext } from '../internal/context.js';
-import { Brandable } from './Brandable.js';
-import { Alert, Divider, Identity, PoweredBy, Spinner, TestModeBadge } from './parts.js';
+import { useState, type FormEvent } from "react";
+import { ZevAuthError } from "@zevauth/js";
+import { useZevAuthContext } from "../internal/context.js";
+import { Brandable } from "./Brandable.js";
+import {
+  Alert,
+  Divider,
+  Identity,
+  PoweredBy,
+  Spinner,
+  TestModeBadge,
+  ZevMark,
+} from "./parts.js";
 
 export interface SignInProps {
   /** Where to send somebody after a successful sign-in. */
   afterSignInUrl?: string;
+  /**
+   * How the passwordless alternatives are presented.
+   *
+   * `inline` (default) shows every enabled method as its own button.
+   * Honest, and it gets long: with password, magic link and email code
+   * all on, that is three buttons and two dividers under the form.
+   *
+   * `collapsed` shows the primary method and folds the rest behind a
+   * "More options" toggle. Better when several are enabled, and the
+   * choice is yours because it depends on which method you actually
+   * want people to reach for.
+   */
+  secondaryMethods?: "inline" | "collapsed";
   /** Rendered instead of the form once somebody is signed in. */
   children?: React.ReactNode;
   className?: string;
 }
 
 type Stage =
-  | { name: 'credentials' }
-  | { name: 'code-sent'; email: string }
-  | { name: 'link-sent'; email: string };
+  | { name: "credentials" }
+  | { name: "code-sent"; email: string }
+  | { name: "link-sent"; email: string };
 
 /**
  * A complete sign-in box.
@@ -32,26 +53,32 @@ type Stage =
  * simply stops rendering the form and lets the app decide. A component
  * that always navigated would fight every router it was dropped into.
  */
-export function SignIn({ afterSignInUrl, children, className }: SignInProps) {
-  const { client, state } = useZevAuthContext('<SignIn>');
+export function SignIn({
+  afterSignInUrl,
+  secondaryMethods = "inline",
+  children,
+  className,
+}: SignInProps) {
+  const { client, state } = useZevAuthContext("<SignIn>");
 
-  const [identifier, setIdentifier] = useState('');
-  const [password, setPassword] = useState('');
-  const [code, setCode] = useState('');
-  const [stage, setStage] = useState<Stage>({ name: 'credentials' });
+  const [identifier, setIdentifier] = useState("");
+  const [password, setPassword] = useState("");
+  const [code, setCode] = useState("");
+  const [stage, setStage] = useState<Stage>({ name: "credentials" });
+  const [showMore, setShowMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
 
   const branding = client.branding;
   const methods = client.signInMethods;
 
-  const hasPassword = methods.includes('password');
-  const hasMagicLink = methods.includes('magic_link');
-  const hasEmailCode = methods.includes('email_otp');
-  const hasZevId = methods.includes('zevid');
+  const hasPassword = methods.includes("password");
+  const hasMagicLink = methods.includes("magic_link");
+  const hasEmailCode = methods.includes("email_otp");
+  const hasZevId = methods.includes("zevid");
 
   if (state.isLoaded && state.user) {
-    if (afterSignInUrl && typeof window !== 'undefined') {
+    if (afterSignInUrl && typeof window !== "undefined") {
       window.location.assign(afterSignInUrl);
     }
     return <>{children ?? null}</>;
@@ -71,7 +98,7 @@ export function SignIn({ afterSignInUrl, children, className }: SignInProps) {
       setError(
         err instanceof ZevAuthError
           ? err.message
-          : 'Something went wrong. Please try again.',
+          : "Something went wrong. Please try again.",
       );
     } finally {
       setIsBusy(false);
@@ -86,21 +113,19 @@ export function SignIn({ afterSignInUrl, children, className }: SignInProps) {
   const onSendCode = () =>
     void run(async () => {
       await client.signIn.startEmailCode({ email: identifier });
-      setStage({ name: 'code-sent', email: identifier });
+      setStage({ name: "code-sent", email: identifier });
     });
 
   const onSendLink = () =>
     void run(async () => {
       await client.signIn.startMagicLink({ email: identifier });
-      setStage({ name: 'link-sent', email: identifier });
+      setStage({ name: "link-sent", email: identifier });
     });
 
   const onVerifyCode = (event: FormEvent) => {
     event.preventDefault();
-    if (stage.name !== 'code-sent') return;
-    void run(() =>
-      client.signIn.verifyEmailCode({ email: stage.email, code }),
-    );
+    if (stage.name !== "code-sent") return;
+    void run(() => client.signIn.verifyEmailCode({ email: stage.email, code }));
   };
 
   return (
@@ -109,7 +134,7 @@ export function SignIn({ afterSignInUrl, children, className }: SignInProps) {
         {client.isTestMode ? <TestModeBadge /> : null}
         <Identity branding={branding} />
 
-        {stage.name === 'link-sent' ? (
+        {stage.name === "link-sent" ? (
           <>
             <h1 className="zv-title">Check your email</h1>
             <p className="zv-subtitle">
@@ -119,12 +144,12 @@ export function SignIn({ afterSignInUrl, children, className }: SignInProps) {
               type="button"
               className="zv-button"
               data-variant="ghost"
-              onClick={() => setStage({ name: 'credentials' })}
+              onClick={() => setStage({ name: "credentials" })}
             >
               Use something else
             </button>
           </>
-        ) : stage.name === 'code-sent' ? (
+        ) : stage.name === "code-sent" ? (
           <>
             <h1 className="zv-title">Enter your code</h1>
             <p className="zv-subtitle">
@@ -163,7 +188,7 @@ export function SignIn({ afterSignInUrl, children, className }: SignInProps) {
               type="button"
               className="zv-button"
               data-variant="ghost"
-              onClick={() => setStage({ name: 'credentials' })}
+              onClick={() => setStage({ name: "credentials" })}
             >
               Use something else
             </button>
@@ -182,6 +207,14 @@ export function SignIn({ afterSignInUrl, children, className }: SignInProps) {
                   disabled={isBusy}
                   onClick={() => client.signIn.withZevId()}
                 >
+                  {/*
+                    The provider's mark, the way every other SSO button
+                    in the category carries one. A button that names a
+                    provider without showing it asks somebody to read
+                    where they would otherwise recognise, and it is the
+                    one control on the page that leaves the site.
+                  */}
+                  <ZevMark size={13} />
                   Continue with ZevID
                 </button>
                 {hasPassword || hasMagicLink || hasEmailCode ? (
@@ -237,8 +270,40 @@ export function SignIn({ afterSignInUrl, children, className }: SignInProps) {
               </form>
             ) : null}
 
+            {/*
+              The alternatives, either laid out or folded away.
+
+              Collapsed still RENDERS them, so the toggle can animate and
+              so a form autofill or a screen reader is not surprised by
+              content appearing from nowhere. `inert` keeps them out of
+              the tab order while they are hidden, or somebody tabbing
+              through lands on buttons they cannot see.
+            */}
             {(hasMagicLink || hasEmailCode) && hasPassword ? (
-              <Divider label="or" />
+              secondaryMethods === "collapsed" ? (
+                <button
+                  type="button"
+                  className="zv-more"
+                  aria-expanded={showMore}
+                  onClick={() => setShowMore((open) => !open)}
+                >
+                  More options
+                  <svg
+                    className="zv-chevron"
+                    width="11"
+                    height="11"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    aria-hidden="true"
+                  >
+                    <path d="M6 9l6 6 6-6" />
+                  </svg>
+                </button>
+              ) : (
+                <Divider label="or" />
+              )
             ) : null}
 
             {!hasPassword && (hasMagicLink || hasEmailCode) ? (
@@ -260,28 +325,42 @@ export function SignIn({ afterSignInUrl, children, className }: SignInProps) {
               </div>
             ) : null}
 
-            {hasMagicLink ? (
-              <button
-                type="button"
-                className="zv-button"
-                data-variant="secondary"
-                disabled={isBusy || !identifier}
-                onClick={onSendLink}
+            {hasMagicLink || hasEmailCode ? (
+              <div
+                className="zv-reveal"
+                data-open={
+                  secondaryMethods === "inline" || showMore ? "true" : "false"
+                }
+                inert={secondaryMethods === "collapsed" && !showMore}
               >
-                Email me a sign-in link
-              </button>
-            ) : null}
+                <div
+                  style={{ display: "flex", flexDirection: "column", gap: 12 }}
+                >
+                  {hasMagicLink ? (
+                    <button
+                      type="button"
+                      className="zv-button"
+                      data-variant="secondary"
+                      disabled={isBusy || !identifier}
+                      onClick={onSendLink}
+                    >
+                      Email me a sign-in link
+                    </button>
+                  ) : null}
 
-            {hasEmailCode ? (
-              <button
-                type="button"
-                className="zv-button"
-                data-variant="secondary"
-                disabled={isBusy || !identifier}
-                onClick={onSendCode}
-              >
-                Email me a code
-              </button>
+                  {hasEmailCode ? (
+                    <button
+                      type="button"
+                      className="zv-button"
+                      data-variant="secondary"
+                      disabled={isBusy || !identifier}
+                      onClick={onSendCode}
+                    >
+                      Email me a code
+                    </button>
+                  ) : null}
+                </div>
+              </div>
             ) : null}
 
             {hasPassword ? (
@@ -294,7 +373,7 @@ export function SignIn({ afterSignInUrl, children, className }: SignInProps) {
                   onClick={() =>
                     void run(async () => {
                       await client.passwordReset.start({ email: identifier });
-                      setStage({ name: 'link-sent', email: identifier });
+                      setStage({ name: "link-sent", email: identifier });
                     })
                   }
                 >
@@ -311,8 +390,8 @@ export function SignIn({ afterSignInUrl, children, className }: SignInProps) {
                * looking at this in their own app.
                */
               <div className="zv-notice">
-                No sign-in methods are enabled for this environment. Turn one
-                on under Authentication in the ZevAuth console.
+                No sign-in methods are enabled for this environment. Turn one on
+                under Authentication in the ZevAuth console.
               </div>
             ) : null}
           </>

@@ -14,6 +14,8 @@ import { useAuth } from '../src/hooks/useAuth';
 import { useUser } from '../src/hooks/useUser';
 import { SignIn } from '../src/components/SignIn';
 import { UserButton } from '../src/components/UserButton';
+import { UserProfile } from '../src/components/UserProfile';
+import { SignInWithZevId } from '../src/components/SignInWithZevId';
 import { readableOn } from '../src/components/Brandable';
 import { OrganizationProfile } from '../src/components/OrganizationProfile';
 import { SignUp } from '../src/components/SignUp';
@@ -402,6 +404,94 @@ check(
   'a malformed colour falls back rather than throwing',
   readableOn('nonsense') === '#ffffff',
 );
+
+console.log('\n\x1b[1mSecondary methods: inline vs collapsed\x1b[0m');
+
+{
+  const all = { loaded: true, user: null, methods: ['password', 'magic_link', 'email_otp'] };
+
+  const inline = render(clientIn(all), <SignIn />);
+  check('inline is the default', inline.includes('data-open="true"'));
+  check('and it is not behind a toggle', !inline.includes('More options'));
+
+  const collapsed = render(clientIn(all), <SignIn secondaryMethods="collapsed" />);
+  check('collapsed offers a toggle', collapsed.includes('More options'));
+  check('the alternatives start folded', collapsed.includes('data-open="false"'));
+  check(
+    'and are out of the tab order while folded',
+    /inert/.test(collapsed),
+  );
+  check(
+    'but still rendered, so the toggle can animate',
+    collapsed.includes('Email me a code'),
+  );
+  check(
+    'the toggle reports its state to a screen reader',
+    collapsed.includes('aria-expanded="false"'),
+  );
+
+  // With only one method there is nothing to fold, so no toggle.
+  const onlyPassword = render(
+    clientIn({ loaded: true, user: null, methods: ['password'] }),
+    <SignIn secondaryMethods="collapsed" />,
+  );
+  check(
+    'no toggle when there is nothing to collapse',
+    !onlyPassword.includes('More options'),
+  );
+}
+
+console.log('\n\x1b[1m<SignInWithZevId> on its own\x1b[0m');
+
+{
+  const button = render(
+    clientIn({ loaded: true, user: null, methods: ['zevid'] }),
+    <SignInWithZevId />,
+  );
+  check('it renders a button', button.includes('zv-button'));
+  check('carrying the Zev mark', button.includes('495.23 347'));
+  check('with no card around it', !button.includes('zv-card'));
+  check(
+    'and no attribution, since it sits in your layout',
+    !button.includes('Secured by'),
+  );
+
+  const custom = render(
+    clientIn({ loaded: true, user: null, methods: ['zevid'] }),
+    <SignInWithZevId label="Sign in with ZevID" variant="primary" />,
+  );
+  check('the label is yours to set', custom.includes('Sign in with ZevID'));
+  check('so is the variant', custom.includes('data-variant="primary"'));
+}
+
+console.log('\n\x1b[1m<UserProfile> sections\x1b[0m');
+
+{
+  const both = render(clientIn({ loaded: true, user: USER }), <UserProfile />);
+  check('all shows the profile fields', both.includes('First name'));
+  check('and the password disclosure', both.includes('Change password'));
+  check('with the password fields closed', both.includes('data-open="false"'));
+
+  const open = render(
+    clientIn({ loaded: true, user: USER }),
+    <UserProfile defaultPasswordOpen />,
+  );
+  check('they can start open', open.includes('data-open="true"'));
+
+  const profileOnly = render(
+    clientIn({ loaded: true, user: USER }),
+    <UserProfile section="profile" />,
+  );
+  check('profile alone omits the password section', !profileOnly.includes('Change password'));
+  check('and keeps the name fields', profileOnly.includes('First name'));
+
+  const securityOnly = render(
+    clientIn({ loaded: true, user: USER }),
+    <UserProfile section="security" />,
+  );
+  check('security alone omits the name fields', !securityOnly.includes('First name'));
+  check('and keeps the password section', securityOnly.includes('Change password'));
+}
 
 console.log('\n\x1b[1m<UserButton>\x1b[0m');
 

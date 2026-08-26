@@ -63,7 +63,7 @@ export function OrganizationProfile({ className }: OrganizationProfileProps) {
   if (!organization) {
     return (
       <Brandable branding={client.branding} className={className}>
-        <div className="zv-card" style={{ maxWidth: 460 }}>
+        <div className="zv-card" data-size="wide">
           <div className="zv-notice">
             This session is not acting as an organization. Switch to one to
             manage its members.
@@ -94,7 +94,7 @@ export function OrganizationProfile({ className }: OrganizationProfileProps) {
 
   return (
     <Brandable branding={client.branding} className={className}>
-      <div className="zv-card" style={{ maxWidth: 460 }}>
+      <div className="zv-card" data-size="wide">
         <h1 className="zv-title" style={{ textAlign: 'left' }}>
           {organization.name}
         </h1>

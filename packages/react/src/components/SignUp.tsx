@@ -2,7 +2,15 @@ import { useState, type FormEvent, type ReactNode } from 'react';
 import { ZevAuthError } from '@zevauth/js';
 import { useZevAuthContext } from '../internal/context.js';
 import { Brandable } from './Brandable.js';
-import { Alert, Divider, Identity, PoweredBy, Spinner, TestModeBadge } from './parts.js';
+import {
+  Alert,
+  Divider,
+  Identity,
+  PoweredBy,
+  Spinner,
+  TestModeBadge,
+  ZevMark,
+} from './parts.js';
 
 export interface SignUpProps {
   afterSignUpUrl?: string;
@@ -98,6 +106,14 @@ export function SignUp({ afterSignUpUrl, children, className }: SignUpProps) {
                   disabled={isBusy}
                   onClick={() => client.signIn.withZevId()}
                 >
+                  {/*
+                    The provider's mark, the way every other SSO button
+                    in the category carries one. A button that names a
+                    provider without showing it asks somebody to read
+                    where they would otherwise recognise, and it is the
+                    one control on the page that leaves the site.
+                  */}
+                  <ZevMark size={13} />
                   Continue with ZevID
                 </button>
                 {hasPassword ? <Divider label="or" /> : null}
