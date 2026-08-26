@@ -12,6 +12,9 @@ import {
 } from '../src/components/control';
 import { useAuth } from '../src/hooks/useAuth';
 import { useUser } from '../src/hooks/useUser';
+import { SignIn } from '../src/components/SignIn';
+import { UserButton } from '../src/components/UserButton';
+import { readableOn } from '../src/components/Brandable';
 
 let passed = 0;
 let failed = 0;
@@ -42,10 +45,26 @@ const USER = {
 };
 
 /** A client already in a known state, so rendering is synchronous. */
+const BRANDING = {
+  appName: 'Northwind',
+  logoUrl: null,
+  showAppName: true,
+  accentColor: '#2563eb',
+  accentOnLight: '#2563eb',
+  accentOnDark: '#7ba4f5',
+  colorScheme: 'light' as const,
+  borderRadius: 'medium' as const,
+  fontFamily: 'system' as const,
+  showPoweredBy: true,
+};
+
 function clientIn(state: {
   loaded: boolean;
   user?: typeof USER | null;
   organization?: { id: string; name: string; slug: string | null; role: string; permissions?: string[] } | null;
+  methods?: string[];
+  branding?: Partial<typeof BRANDING> | null;
+  isTestMode?: boolean;
 }): ZevAuth {
   const client = createZevAuth({
     publishableKey: 'pk_test_x',
@@ -64,6 +83,19 @@ function clientIn(state: {
   Object.defineProperty(client, 'user', { get: () => state.user ?? null });
   Object.defineProperty(client, 'organization', {
     get: () => state.organization ?? null,
+  });
+  Object.defineProperty(client, 'signInMethods', {
+    get: () => state.methods ?? [],
+  });
+  Object.defineProperty(client, 'branding', {
+    get: () =>
+      state.branding === null ? null : { ...BRANDING, ...state.branding },
+  });
+  Object.defineProperty(client, 'isTestMode', {
+    get: () => state.isTestMode ?? false,
+  });
+  Object.defineProperty(client, 'environmentId', {
+    get: () => 'env_test_x',
   });
   client.load = async () => {};
 
@@ -254,6 +286,144 @@ console.log('\n\x1b[1museAuth carries ids, not a profile\x1b[0m');
     <TokenShape />,
   );
   check('it reports the user and organization ids', html.includes('user_1|org_1|true'));
+}
+
+console.log('\n\x1b[1m<SignIn> renders what is ENABLED\x1b[0m');
+
+{
+  const passwordOnly = render(
+    clientIn({ loaded: true, user: null, methods: ['password'] }),
+    <SignIn />,
+  );
+  check('a password form is offered', passwordOnly.includes('type="password"'));
+  check(
+    'the identifier field is filed under `username`, so either works',
+    passwordOnly.includes('autoComplete="username"') ||
+      passwordOnly.includes('autocomplete="username"'),
+  );
+  check(
+    'no ZevID button when SSO is off',
+    !passwordOnly.includes('Continue with ZevID'),
+  );
+  check(
+    'no code button when email codes are off',
+    !passwordOnly.includes('Email me a code'),
+  );
+  check('and a way out of a forgotten password', passwordOnly.includes('Forgot'));
+
+  const everything = render(
+    clientIn({
+      loaded: true,
+      user: null,
+      methods: ['password', 'magic_link', 'email_otp', 'zevid'],
+    }),
+    <SignIn />,
+  );
+  check('SSO appears when enabled', everything.includes('Continue with ZevID'));
+  check('so does the link option', everything.includes('sign-in link'));
+  check('and the code option', everything.includes('Email me a code'));
+
+  const nothing = render(
+    clientIn({ loaded: true, user: null, methods: [] }),
+    <SignIn />,
+  );
+  check(
+    'an environment with nothing enabled says so, rather than rendering an empty box',
+    nothing.includes('No sign-in methods are enabled'),
+  );
+}
+
+console.log('\n\x1b[1mBranding and attribution\x1b[0m');
+
+{
+  const branded = render(
+    clientIn({ loaded: true, user: null, methods: ['password'] }),
+    <SignIn />,
+  );
+  check('the accent is applied as a CSS variable', branded.includes('--zv-accent'));
+  check('the app name is shown', branded.includes('Northwind'));
+  check(
+    'the attribution links to www, skipping the redirect hop',
+    branded.includes('https://www.zevauth.com'),
+  );
+  check(
+    'carrying which environment it came from',
+    branded.includes('ref=env_test_x'),
+  );
+  check(
+    'and it opens in a new tab, safely',
+    branded.includes('rel="noopener noreferrer"'),
+  );
+
+  const noBadge = render(
+    clientIn({
+      loaded: true,
+      user: null,
+      methods: ['password'],
+      branding: { showPoweredBy: false },
+    }),
+    <SignIn />,
+  );
+  check(
+    'a plan that allows removing the badge removes it',
+    !noBadge.includes('Secured by'),
+  );
+
+  const wordmark = render(
+    clientIn({
+      loaded: true,
+      user: null,
+      methods: ['password'],
+      branding: { logoUrl: 'https://cdn.test/logo.svg', showAppName: false },
+    }),
+    <SignIn />,
+  );
+  check('a wordmark logo does not print the name twice', !wordmark.includes('zv-appname'));
+  check(
+    'but the logo carries the name for screen readers',
+    wordmark.includes('alt="Northwind"'),
+  );
+
+  const testMode = render(
+    clientIn({ loaded: true, user: null, methods: ['password'], isTestMode: true }),
+    <SignIn />,
+  );
+  check('test mode is called out', testMode.includes('Test mode'));
+  check('and production says nothing about it', !branded.includes('Test mode'));
+}
+
+console.log('\n\x1b[1mContrast on the accent\x1b[0m');
+
+check('a pale accent gets dark text', readableOn('#ffe066') === '#171717');
+check('a dark accent gets light text', readableOn('#1a1a1a') === '#ffffff');
+check(
+  'a malformed colour falls back rather than throwing',
+  readableOn('nonsense') === '#ffffff',
+);
+
+console.log('\n\x1b[1m<UserButton>\x1b[0m');
+
+{
+  const signedOut = render(
+    clientIn({ loaded: true, user: null }),
+    <UserButton />,
+  );
+  check(
+    'it renders nothing when nobody is signed in',
+    !signedOut.includes('zv-trigger'),
+  );
+
+  const signedIn = render(clientIn({ loaded: true, user: USER }), <UserButton />);
+  check('an avatar appears when signed in', signedIn.includes('zv-avatar'));
+  check(
+    'the trigger is labelled for a screen reader',
+    signedIn.includes('aria-label="Account menu for A"'),
+  );
+  check(
+    'and announces that it opens a menu',
+    signedIn.includes('aria-haspopup="menu"'),
+  );
+  check('the menu is closed until asked for', !signedIn.includes('Sign out'));
 }
 
 console.log(

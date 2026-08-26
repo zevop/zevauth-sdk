@@ -12,6 +12,7 @@ import { OrganizationsFlow } from './flows/organizations.js';
 import { UserFlow } from './flows/user.js';
 import {
   ZevAuthError,
+  type Branding,
   type ActiveOrganization,
   type EnvironmentConfig,
   type SignInMethod,
@@ -142,6 +143,22 @@ export class ZevAuth {
 
   get isTestMode(): boolean {
     return this.environment?.isTestMode ?? false;
+  }
+
+  /** The developer's brand, for anything the SDK renders. */
+  get branding(): Branding | null {
+    return this.environment?.branding ?? null;
+  }
+
+  /**
+   * The environment this key resolves to, e.g. `env_live_…`.
+   *
+   * Public: it is already the audience inside every token this app
+   * holds. Used for attribution links and for telling test from
+   * production in a log.
+   */
+  get environmentId(): string | null {
+    return this.environment?.id ?? null;
   }
 
   /** Subscribe to sign-in, sign-out and organization changes. */

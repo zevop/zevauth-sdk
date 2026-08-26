@@ -1,0 +1,327 @@
+import { useState, type FormEvent } from 'react';
+import { ZevAuthError } from '@zevauth/js';
+import { useZevAuthContext } from '../internal/context.js';
+import { Brandable } from './Brandable.js';
+import { Alert, Divider, Identity, PoweredBy, Spinner, TestModeBadge } from './parts.js';
+
+export interface SignInProps {
+  /** Where to send somebody after a successful sign-in. */
+  afterSignInUrl?: string;
+  /** Rendered instead of the form once somebody is signed in. */
+  children?: React.ReactNode;
+  className?: string;
+}
+
+type Stage =
+  | { name: 'credentials' }
+  | { name: 'code-sent'; email: string }
+  | { name: 'link-sent'; email: string };
+
+/**
+ * A complete sign-in box.
+ *
+ * ── It renders what the environment has ENABLED, not a fixed set ──
+ * The methods come from the API at load. A developer who turns passkeys
+ * off in the console should stop being offered them in their app without
+ * a deploy, and one who turns magic links on should get them the same
+ * way. Hard-coding the list here would make the console's switches
+ * advisory.
+ *
+ * ── Why it does not redirect by itself ────────────────────────────
+ * `afterSignInUrl` is honoured when given, and otherwise the component
+ * simply stops rendering the form and lets the app decide. A component
+ * that always navigated would fight every router it was dropped into.
+ */
+export function SignIn({ afterSignInUrl, children, className }: SignInProps) {
+  const { client, state } = useZevAuthContext('<SignIn>');
+
+  const [identifier, setIdentifier] = useState('');
+  const [password, setPassword] = useState('');
+  const [code, setCode] = useState('');
+  const [stage, setStage] = useState<Stage>({ name: 'credentials' });
+  const [error, setError] = useState<string | null>(null);
+  const [isBusy, setIsBusy] = useState(false);
+
+  const branding = client.branding;
+  const methods = client.signInMethods;
+
+  const hasPassword = methods.includes('password');
+  const hasMagicLink = methods.includes('magic_link');
+  const hasEmailCode = methods.includes('email_otp');
+  const hasZevId = methods.includes('zevid');
+
+  if (state.isLoaded && state.user) {
+    if (afterSignInUrl && typeof window !== 'undefined') {
+      window.location.assign(afterSignInUrl);
+    }
+    return <>{children ?? null}</>;
+  }
+
+  async function run(action: () => Promise<void>) {
+    setIsBusy(true);
+    setError(null);
+    try {
+      await action();
+    } catch (err) {
+      /*
+       * The API writes its messages for people, so they are shown as
+       * written. Anything else is ours and says nothing useful about
+       * their credentials.
+       */
+      setError(
+        err instanceof ZevAuthError
+          ? err.message
+          : 'Something went wrong. Please try again.',
+      );
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  const onSubmitPassword = (event: FormEvent) => {
+    event.preventDefault();
+    void run(() => client.signIn.withPassword({ identifier, password }));
+  };
+
+  const onSendCode = () =>
+    void run(async () => {
+      await client.signIn.startEmailCode({ email: identifier });
+      setStage({ name: 'code-sent', email: identifier });
+    });
+
+  const onSendLink = () =>
+    void run(async () => {
+      await client.signIn.startMagicLink({ email: identifier });
+      setStage({ name: 'link-sent', email: identifier });
+    });
+
+  const onVerifyCode = (event: FormEvent) => {
+    event.preventDefault();
+    if (stage.name !== 'code-sent') return;
+    void run(() =>
+      client.signIn.verifyEmailCode({ email: stage.email, code }),
+    );
+  };
+
+  return (
+    <Brandable branding={branding} className={className}>
+      <div className="zv-card">
+        {client.isTestMode ? <TestModeBadge /> : null}
+        <Identity branding={branding} />
+
+        {stage.name === 'link-sent' ? (
+          <>
+            <h1 className="zv-title">Check your email</h1>
+            <p className="zv-subtitle">
+              If {stage.email} has an account, a sign-in link is on its way.
+            </p>
+            <button
+              type="button"
+              className="zv-button"
+              data-variant="ghost"
+              onClick={() => setStage({ name: 'credentials' })}
+            >
+              Use something else
+            </button>
+          </>
+        ) : stage.name === 'code-sent' ? (
+          <>
+            <h1 className="zv-title">Enter your code</h1>
+            <p className="zv-subtitle">
+              If {stage.email} has an account, we sent it a code.
+            </p>
+            {error ? <Alert>{error}</Alert> : null}
+            <form className="zv-fields" onSubmit={onVerifyCode}>
+              <div className="zv-field">
+                <label className="zv-label" htmlFor="zv-code">
+                  Code
+                </label>
+                <input
+                  id="zv-code"
+                  className="zv-input"
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                  disabled={isBusy}
+                  /* Lets a phone offer the code from the message rather
+                     than making somebody switch apps to read it. */
+                  autoComplete="one-time-code"
+                  inputMode="numeric"
+                  autoFocus
+                />
+              </div>
+              <button
+                type="submit"
+                className="zv-button"
+                data-variant="primary"
+                disabled={isBusy || code.length === 0}
+              >
+                {isBusy ? <Spinner /> : null}
+                Continue
+              </button>
+            </form>
+            <button
+              type="button"
+              className="zv-button"
+              data-variant="ghost"
+              onClick={() => setStage({ name: 'credentials' })}
+            >
+              Use something else
+            </button>
+          </>
+        ) : (
+          <>
+            <h1 className="zv-title">Sign in</h1>
+            {error ? <Alert>{error}</Alert> : null}
+
+            {hasZevId ? (
+              <>
+                <button
+                  type="button"
+                  className="zv-button"
+                  data-variant="secondary"
+                  disabled={isBusy}
+                  onClick={() => client.signIn.withZevId()}
+                >
+                  Continue with ZevID
+                </button>
+                {hasPassword || hasMagicLink || hasEmailCode ? (
+                  <Divider label="or" />
+                ) : null}
+              </>
+            ) : null}
+
+            {hasPassword ? (
+              <form className="zv-fields" onSubmit={onSubmitPassword}>
+                <div className="zv-field">
+                  <label className="zv-label" htmlFor="zv-identifier">
+                    Email
+                  </label>
+                  <input
+                    id="zv-identifier"
+                    className="zv-input"
+                    value={identifier}
+                    onChange={(e) => setIdentifier(e.target.value)}
+                    disabled={isBusy}
+                    /*
+                     * `username` rather than `email`: the field accepts
+                     * either, and password managers file the credential
+                     * under whatever is typed here.
+                     */
+                    autoComplete="username"
+                    autoFocus
+                  />
+                </div>
+                <div className="zv-field">
+                  <label className="zv-label" htmlFor="zv-password">
+                    Password
+                  </label>
+                  <input
+                    id="zv-password"
+                    className="zv-input"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    disabled={isBusy}
+                    autoComplete="current-password"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  className="zv-button"
+                  data-variant="primary"
+                  disabled={isBusy || !identifier || !password}
+                >
+                  {isBusy ? <Spinner /> : null}
+                  Sign in
+                </button>
+              </form>
+            ) : null}
+
+            {(hasMagicLink || hasEmailCode) && hasPassword ? (
+              <Divider label="or" />
+            ) : null}
+
+            {!hasPassword && (hasMagicLink || hasEmailCode) ? (
+              <div className="zv-fields">
+                <div className="zv-field">
+                  <label className="zv-label" htmlFor="zv-email">
+                    Email
+                  </label>
+                  <input
+                    id="zv-email"
+                    className="zv-input"
+                    value={identifier}
+                    onChange={(e) => setIdentifier(e.target.value)}
+                    disabled={isBusy}
+                    autoComplete="email"
+                    autoFocus
+                  />
+                </div>
+              </div>
+            ) : null}
+
+            {hasMagicLink ? (
+              <button
+                type="button"
+                className="zv-button"
+                data-variant="secondary"
+                disabled={isBusy || !identifier}
+                onClick={onSendLink}
+              >
+                Email me a sign-in link
+              </button>
+            ) : null}
+
+            {hasEmailCode ? (
+              <button
+                type="button"
+                className="zv-button"
+                data-variant="secondary"
+                disabled={isBusy || !identifier}
+                onClick={onSendCode}
+              >
+                Email me a code
+              </button>
+            ) : null}
+
+            {hasPassword ? (
+              <div className="zv-footer">
+                <button
+                  type="button"
+                  className="zv-button"
+                  data-variant="ghost"
+                  disabled={isBusy || !identifier}
+                  onClick={() =>
+                    void run(async () => {
+                      await client.passwordReset.start({ email: identifier });
+                      setStage({ name: 'link-sent', email: identifier });
+                    })
+                  }
+                >
+                  Forgot your password?
+                </button>
+              </div>
+            ) : null}
+
+            {methods.length === 0 && state.isLoaded ? (
+              /*
+               * Said plainly rather than rendering an empty box. An
+               * environment with nothing enabled is a configuration
+               * mistake, and the person who can fix it is the developer
+               * looking at this in their own app.
+               */
+              <div className="zv-notice">
+                No sign-in methods are enabled for this environment. Turn one
+                on under Authentication in the ZevAuth console.
+              </div>
+            ) : null}
+          </>
+        )}
+
+        {branding?.showPoweredBy !== false ? (
+          <PoweredBy environmentId={client.environmentId} />
+        ) : null}
+      </div>
+    </Brandable>
+  );
+}

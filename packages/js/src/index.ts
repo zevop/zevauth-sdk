@@ -11,6 +11,7 @@ export { UserFlow } from './flows/user.js';
 export {
   ZevAuthError,
   type ActiveOrganization,
+  type Branding,
   type EnvironmentConfig,
   type SignInMethod,
   type ZevAuthSession,

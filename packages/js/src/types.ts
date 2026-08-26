@@ -46,11 +46,29 @@ export type SignInMethod =
   | 'username'
   | 'zevid';
 
+/** The developer's brand, resolved server-side and ready to paint. */
+export interface Branding {
+  appName: string;
+  logoUrl: string | null;
+  /** Whether the name prints under the logo. Always true with no logo. */
+  showAppName: boolean;
+  accentColor: string | null;
+  /** Contrast-corrected for each surface. Never re-derive these. */
+  accentOnLight: string;
+  accentOnDark: string;
+  colorScheme: 'light' | 'dark' | 'system';
+  borderRadius: 'none' | 'small' | 'medium' | 'large' | 'pill';
+  fontFamily: 'system' | 'sans' | 'serif' | 'mono';
+  /** Plan-gated on the server. A client cannot turn this off. */
+  showPoweredBy: boolean;
+}
+
 export interface EnvironmentConfig {
   id: string;
   kind: 'test' | 'live';
   isTestMode: boolean;
   signInMethods: SignInMethod[];
+  branding: Branding;
 }
 
 /** What every listener receives. `null` user means signed out. */

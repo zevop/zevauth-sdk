@@ -10,6 +10,13 @@ export {
   type UseOrganizationList,
 } from './hooks/useOrganization.js';
 
+export { SignIn, type SignInProps } from './components/SignIn.js';
+export { UserButton, type UserButtonProps } from './components/UserButton.js';
+export {
+  OrganizationSwitcher,
+  type OrganizationSwitcherProps,
+} from './components/OrganizationSwitcher.js';
+
 export {
   SignedIn,
   SignedOut,
@@ -22,6 +29,7 @@ export {
 // name a type in its own code.
 export type {
   ActiveOrganization,
+  Branding,
   OrganizationMember,
   OrganizationMembership,
   SignInMethod,

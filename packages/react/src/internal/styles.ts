@@ -1,0 +1,270 @@
+/**
+ * The one stylesheet the components use.
+ *
+ * ── Why a stylesheet, and not inline styles ───────────────────────
+ * Inline styles cannot express `:hover`, `:focus-visible`, `:disabled`
+ * or a media query, and an auth form without a visible focus ring is
+ * unusable by keyboard. So there has to be real CSS somewhere.
+ *
+ * ── Why it is injected, and not a file to import ──────────────────
+ * A `import '@zevauth/react/styles.css'` is a line every developer has
+ * to add, breaks in any setup that does not handle CSS imports, and is
+ * the single most common "why does it look broken" support question in
+ * this category. Injecting once on first render means the components
+ * work the moment they are rendered, in every bundler, with no setup.
+ *
+ * ── Why every class is prefixed ───────────────────────────────────
+ * These styles land in someone else's page. `zv-` prefixes and a
+ * refusal to style bare elements mean nothing here can reach their
+ * markup, and nothing of theirs accidentally reaches ours.
+ *
+ * ── Why the brand arrives as CSS variables ────────────────────────
+ * The accent is per-environment and only known after the API answers.
+ * Custom properties let one static stylesheet be repainted by setting
+ * variables on a wrapper, instead of generating CSS per tenant.
+ */
+
+const STYLE_ID = 'zevauth-components';
+
+const CSS = `
+.zv-root {
+  --zv-radius: 8px;
+  --zv-bg: #ffffff;
+  --zv-surface: #ffffff;
+  --zv-text: #18181b;
+  --zv-muted: #71717a;
+  --zv-border: #e4e4e7;
+  --zv-field: #ffffff;
+  --zv-error: #b91c1c;
+  --zv-accent: #18181b;
+  --zv-on-accent: #ffffff;
+
+  font-family: var(--zv-font, -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    Roboto, 'Helvetica Neue', Arial, sans-serif);
+  color: var(--zv-text);
+  /*
+   * Isolated from the host page's box model. A developer with a global
+   * \`* { box-sizing: content-box }\` would otherwise get fields wider
+   * than their container, and it would be our bug to them.
+   */
+  box-sizing: border-box;
+}
+.zv-root *, .zv-root *::before, .zv-root *::after { box-sizing: inherit; }
+
+.zv-root[data-theme='dark'] {
+  --zv-surface: #18181b;
+  --zv-text: #fafafa;
+  --zv-muted: #a1a1aa;
+  --zv-border: #333338;
+  --zv-field: #0f0f11;
+  --zv-error: #f87171;
+}
+
+.zv-card {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  width: 100%;
+  max-width: 380px;
+  padding: 28px 26px;
+  background: var(--zv-surface);
+  border: 1px solid var(--zv-border);
+  border-radius: calc(var(--zv-radius) * 1.5);
+}
+
+.zv-identity { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.zv-logo { max-height: 30px; max-width: 170px; object-fit: contain; }
+.zv-appname { font-size: 12.5px; color: var(--zv-muted); }
+.zv-title { margin: 0; font-size: 16.5px; font-weight: 600; text-align: center; letter-spacing: -0.01em; }
+.zv-subtitle { margin: 0; font-size: 13px; line-height: 1.5; color: var(--zv-muted); text-align: center; }
+
+.zv-fields { display: flex; flex-direction: column; gap: 12px; }
+.zv-field { display: flex; flex-direction: column; gap: 5px; }
+.zv-label { font-size: 12.5px; font-weight: 500; }
+
+.zv-input {
+  width: 100%;
+  padding: 9px 11px;
+  font: inherit;
+  font-size: 13.5px;
+  color: var(--zv-text);
+  background: var(--zv-field);
+  border: 1px solid var(--zv-border);
+  border-radius: var(--zv-radius);
+  outline: none;
+  transition: border-color .12s ease, box-shadow .12s ease;
+}
+.zv-input:focus-visible {
+  border-color: var(--zv-accent);
+  /* Focus is a ring, never a removed outline. */
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--zv-accent) 22%, transparent);
+}
+.zv-input[aria-invalid='true'] { border-color: var(--zv-error); }
+.zv-input:disabled { opacity: .55; cursor: not-allowed; }
+
+.zv-hint { font-size: 11.5px; color: var(--zv-muted); }
+.zv-fielderror { font-size: 11.5px; color: var(--zv-error); }
+
+.zv-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 14px;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 500;
+  border-radius: var(--zv-radius);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: opacity .12s ease, background-color .12s ease;
+}
+.zv-button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--zv-accent) 30%, transparent);
+}
+.zv-button:disabled { opacity: .55; cursor: not-allowed; }
+.zv-button[data-variant='primary'] { background: var(--zv-accent); color: var(--zv-on-accent); }
+.zv-button[data-variant='primary']:hover:not(:disabled) { opacity: .9; }
+.zv-button[data-variant='secondary'] {
+  background: transparent; color: var(--zv-text); border-color: var(--zv-border);
+}
+.zv-button[data-variant='secondary']:hover:not(:disabled) { background: var(--zv-border); }
+.zv-button[data-variant='ghost'] {
+  background: transparent; color: var(--zv-muted); border: 0; width: auto; padding: 4px 2px;
+  font-size: 12.5px; text-decoration: underline;
+}
+
+.zv-divider { display: flex; align-items: center; gap: 10px; color: var(--zv-muted); font-size: 11.5px; }
+.zv-divider::before, .zv-divider::after {
+  content: ''; flex: 1; height: 1px; background: var(--zv-border);
+}
+
+.zv-alert {
+  padding: 9px 11px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  border-radius: var(--zv-radius);
+  border: 1px solid color-mix(in srgb, var(--zv-error) 35%, transparent);
+  color: var(--zv-error);
+  background: color-mix(in srgb, var(--zv-error) 8%, transparent);
+}
+
+.zv-notice {
+  padding: 9px 11px; font-size: 12.5px; line-height: 1.45;
+  border-radius: var(--zv-radius);
+  border: 1px dashed var(--zv-border); color: var(--zv-muted);
+}
+
+.zv-footer { display: flex; justify-content: center; gap: 5px; font-size: 12.5px; color: var(--zv-muted); }
+
+.zv-poweredby {
+  display: flex; align-items: center; justify-content: center; gap: 5px;
+  font-size: 11px; color: var(--zv-muted); text-decoration: none;
+}
+.zv-poweredby:hover { opacity: .8; }
+
+.zv-testmode {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 5px 9px; font-size: 11.5px; color: var(--zv-muted);
+  border: 1px dashed var(--zv-border); border-radius: var(--zv-radius);
+}
+.zv-dot { width: 6px; height: 6px; border-radius: 999px; background: currentColor; }
+
+.zv-spinner {
+  width: 14px; height: 14px; border-radius: 999px;
+  border: 2px solid currentColor; border-top-color: transparent;
+  animation: zv-spin .6s linear infinite;
+}
+@keyframes zv-spin { to { transform: rotate(360deg); } }
+
+/* ── Menus ─────────────────────────────────────────────────────── */
+.zv-menu-wrap { position: relative; display: inline-block; }
+
+.zv-trigger {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 4px 6px; font: inherit; font-size: 13px; color: var(--zv-text);
+  background: transparent; border: 1px solid transparent;
+  border-radius: var(--zv-radius); cursor: pointer;
+}
+.zv-trigger:hover { background: color-mix(in srgb, var(--zv-border) 60%, transparent); }
+.zv-trigger:focus-visible {
+  outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--zv-accent) 30%, transparent);
+}
+
+.zv-avatar {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; flex: 0 0 28px;
+  border-radius: 999px; overflow: hidden;
+  background: var(--zv-accent); color: var(--zv-on-accent);
+  font-size: 11.5px; font-weight: 600; letter-spacing: .01em;
+}
+.zv-avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+.zv-menu {
+  position: absolute; top: calc(100% + 6px); right: 0; z-index: 50;
+  min-width: 232px; padding: 6px;
+  display: flex; flex-direction: column; gap: 2px;
+  background: var(--zv-surface);
+  border: 1px solid var(--zv-border);
+  border-radius: calc(var(--zv-radius) * 1.25);
+  box-shadow: 0 8px 28px rgba(0,0,0,.14);
+}
+.zv-menu-header {
+  display: flex; align-items: center; gap: 9px;
+  padding: 8px 8px 10px; border-bottom: 1px solid var(--zv-border); margin-bottom: 4px;
+}
+.zv-menu-name { font-size: 13px; font-weight: 500; }
+.zv-menu-sub { font-size: 11.5px; color: var(--zv-muted); }
+.zv-truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 168px; }
+
+.zv-menu-item {
+  display: flex; align-items: center; gap: 9px; width: 100%;
+  padding: 7px 8px; font: inherit; font-size: 13px; text-align: left;
+  color: var(--zv-text); background: transparent; border: 0;
+  border-radius: var(--zv-radius); cursor: pointer;
+}
+.zv-menu-item:hover:not(:disabled) { background: color-mix(in srgb, var(--zv-border) 60%, transparent); }
+.zv-menu-item:focus-visible {
+  outline: none; box-shadow: 0 0 0 2px color-mix(in srgb, var(--zv-accent) 40%, transparent);
+}
+.zv-menu-item[aria-current='true'] { font-weight: 600; }
+.zv-menu-item:disabled { opacity: .6; cursor: default; }
+.zv-menu-label {
+  padding: 6px 8px 3px; font-size: 10.5px; text-transform: uppercase;
+  letter-spacing: .06em; color: var(--zv-muted);
+}
+
+/* An animation that respects somebody who asked for less of it. */
+@media (prefers-reduced-motion: reduce) {
+  .zv-spinner { animation-duration: 2s; }
+  .zv-input, .zv-button { transition: none; }
+}
+`;
+
+let injected = false;
+
+/**
+ * Injects the stylesheet once per document.
+ *
+ * Guarded by an id as well as a module flag: two copies of the package
+ * in one page — a real possibility with transitive dependencies — would
+ * otherwise each inject their own, and the second would silently win.
+ */
+export function ensureStyles(): void {
+  if (injected) return;
+  if (typeof document === 'undefined') return;
+
+  injected = true;
+  if (document.getElementById(STYLE_ID)) return;
+
+  const style = document.createElement('style');
+  style.id = STYLE_ID;
+  style.textContent = CSS;
+  document.head.appendChild(style);
+}
+
+/** Exposed so the SSR path can inline the same CSS without a document. */
+export const componentStyles = CSS;
+export const componentStyleId = STYLE_ID;
