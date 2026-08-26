@@ -1,5 +1,5 @@
-import type { Http } from '../internal/http';
-import type { SessionResponse } from './sign-in';
+import type { Http } from '../internal/http.js';
+import type { SessionResponse } from './sign-in.js';
 
 export class SignUpFlow {
   constructor(

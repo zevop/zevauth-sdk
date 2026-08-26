@@ -1,4 +1,4 @@
-import type { Http } from '../internal/http';
+import type { Http } from '../internal/http.js';
 
 /**
  * Forgotten passwords.

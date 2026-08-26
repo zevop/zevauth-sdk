@@ -15,10 +15,19 @@ export interface ZevAuthUser {
 }
 
 export interface ActiveOrganization {
+  /** The organization's PUBLIC id. The internal one never leaves the server. */
   id: string;
   name: string;
   slug: string | null;
   role: string;
+  /**
+   * What this member may do.
+   *
+   * Sent alongside the role rather than left for the app to derive from
+   * it: the point of a permission model is that the role-to-permission
+   * mapping can change without every consumer reimplementing it.
+   */
+  permissions?: string[];
 }
 
 export interface ZevAuthSession {

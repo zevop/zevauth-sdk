@@ -1,13 +1,13 @@
-export { ZevAuth, type ZevAuthOptions } from './client';
-export { SignInFlow } from './flows/sign-in';
-export { SignUpFlow } from './flows/sign-up';
-export { PasswordResetFlow } from './flows/password-reset';
+export { ZevAuth, type ZevAuthOptions } from './client.js';
+export { SignInFlow } from './flows/sign-in.js';
+export { SignUpFlow } from './flows/sign-up.js';
+export { PasswordResetFlow } from './flows/password-reset.js';
 export {
   OrganizationsFlow,
   type OrganizationMember,
   type OrganizationMembership,
-} from './flows/organizations';
-export { UserFlow } from './flows/user';
+} from './flows/organizations.js';
+export { UserFlow } from './flows/user.js';
 export {
   ZevAuthError,
   type ActiveOrganization,
@@ -16,10 +16,10 @@ export {
   type ZevAuthSession,
   type ZevAuthState,
   type ZevAuthUser,
-} from './types';
-export type { SessionStorageAdapter } from './internal/tokens';
+} from './types.js';
+export type { SessionStorageAdapter } from './internal/tokens.js';
 
-import { ZevAuth, type ZevAuthOptions } from './client';
+import { ZevAuth, type ZevAuthOptions } from './client.js';
 
 /**
  * The usual way in.

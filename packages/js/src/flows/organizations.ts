@@ -1,5 +1,5 @@
-import type { Http } from '../internal/http';
-import type { ActiveOrganization } from '../types';
+import type { Http } from '../internal/http.js';
+import type { ActiveOrganization } from '../types.js';
 
 export interface OrganizationMembership extends ActiveOrganization {
   imageUrl: string | null;

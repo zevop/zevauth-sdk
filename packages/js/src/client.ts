@@ -1,15 +1,15 @@
-import { Http } from './internal/http';
-import { RefreshCoordinator } from './internal/refresh-coordinator';
+import { Http } from './internal/http.js';
+import { RefreshCoordinator } from './internal/refresh-coordinator.js';
 import {
   TokenStore,
   defaultStorage,
   type SessionStorageAdapter,
-} from './internal/tokens';
-import { SignInFlow, type SessionResponse } from './flows/sign-in';
-import { SignUpFlow } from './flows/sign-up';
-import { PasswordResetFlow } from './flows/password-reset';
-import { OrganizationsFlow } from './flows/organizations';
-import { UserFlow } from './flows/user';
+} from './internal/tokens.js';
+import { SignInFlow, type SessionResponse } from './flows/sign-in.js';
+import { SignUpFlow } from './flows/sign-up.js';
+import { PasswordResetFlow } from './flows/password-reset.js';
+import { OrganizationsFlow } from './flows/organizations.js';
+import { UserFlow } from './flows/user.js';
 import {
   ZevAuthError,
   type ActiveOrganization,
@@ -17,7 +17,7 @@ import {
   type SignInMethod,
   type ZevAuthState,
   type ZevAuthUser,
-} from './types';
+} from './types.js';
 
 export interface ZevAuthOptions {
   publishableKey: string;

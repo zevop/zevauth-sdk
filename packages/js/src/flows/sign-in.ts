@@ -1,5 +1,5 @@
-import type { Http } from '../internal/http';
-import type { ActiveOrganization, ZevAuthUser } from '../types';
+import type { Http } from '../internal/http.js';
+import type { ActiveOrganization, ZevAuthUser } from '../types.js';
 
 export interface SessionResponse {
   user: ZevAuthUser;

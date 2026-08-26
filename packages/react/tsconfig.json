@@ -1,0 +1,18 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "jsx": "react-jsx",
+    "composite": true
+  },
+  /*
+   * A project reference, not a `paths` alias. The alias pulled the js
+   * package's SOURCE into this program, which put files outside
+   * `rootDir` and meant every build compiled both packages twice.
+   * The reference builds `js` first and consumes its declarations,
+   * which is also what a consumer installing from npm will get.
+   */
+  "references": [{ "path": "../js" }],
+  "include": ["src"]
+}

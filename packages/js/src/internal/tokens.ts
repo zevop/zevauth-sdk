@@ -1,4 +1,4 @@
-import type { ActiveOrganization, ZevAuthUser } from '../types';
+import type { ActiveOrganization, ZevAuthUser } from '../types.js';
 
 /**
  * Where the session lives between page loads.

@@ -1,4 +1,4 @@
-import { ZevAuthError } from '../types';
+import { ZevAuthError } from '../types.js';
 
 export interface HttpOptions {
   baseUrl: string;

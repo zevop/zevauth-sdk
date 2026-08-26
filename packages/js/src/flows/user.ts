@@ -1,6 +1,6 @@
-import type { Http } from '../internal/http';
-import type { ActiveOrganization, ZevAuthUser } from '../types';
-import type { OrganizationMembership } from './organizations';
+import type { Http } from '../internal/http.js';
+import type { ActiveOrganization, ZevAuthUser } from '../types.js';
+import type { OrganizationMembership } from './organizations.js';
 
 /**
  * The signed-in person, as the server sees them right now.
