@@ -142,6 +142,52 @@ function fakeApi(options: {
       });
     }
 
+    if (path === '/v1/me') {
+      // Only ever with a session token. A publishable key here is the
+      // mistake the guard exists to catch, so the fake refuses it too.
+      if (!auth?.startsWith('Bearer at_')) {
+        return json(401, {
+          error: {
+            code: 'unauthorized',
+            message: 'This endpoint needs a signed-in user’s access token.',
+          },
+        });
+      }
+      return json(200, {
+        user: { ...USER, firstName: 'Renamed' },
+        organizations: [
+          { id: 'org_1', name: 'Acme', slug: 'acme', role: 'admin', imageUrl: null },
+        ],
+        organization: null,
+      });
+    }
+
+    if (path === '/v1/me/organizations') {
+      if (!auth?.startsWith('Bearer at_')) return json(401, {});
+      return json(200, {
+        organizations: [
+          { id: 'org_1', name: 'Acme', slug: 'acme', role: 'admin', imageUrl: null },
+        ],
+      });
+    }
+
+    if (path === '/v1/me/organization/members') {
+      if (!auth?.startsWith('Bearer at_')) return json(401, {});
+      return json(200, {
+        members: [
+          {
+            userId: 'user_1',
+            email: 'a@example.com',
+            firstName: 'A',
+            lastName: null,
+            imageUrl: null,
+            role: 'admin',
+            joinedAt: '2026-01-01T00:00:00.000Z',
+          },
+        ],
+      });
+    }
+
     if (path === '/v1/auth/signout') return json(200, {});
 
     return json(404, {
@@ -336,6 +382,41 @@ async function main() {
 
     check('a known and an unknown address answer identically', known === unknown);
     check('and neither starts a session', client.user === null);
+  }
+
+  console.log('\n\x1b[1mOrganizations and the live profile\x1b[0m');
+
+  {
+    const api = fakeApi();
+    const { client } = makeClient(api);
+    await client.load();
+    await client.signIn.withPassword({ identifier: 'a@example.com', password: 'x' });
+
+    const orgs = await client.organizations.list();
+    check('a switcher can be built without a second sign-in', orgs.length === 1);
+    check('and it names the organization', orgs[0]?.id === 'org_1');
+
+    const meCall = api.calls.find((c) => c.path === '/v1/me/organizations');
+    check(
+      'the request carries the PERSON’s token, not the app key',
+      meCall?.auth?.startsWith('Bearer at_') === true,
+      meCall?.auth ?? 'none',
+    );
+
+    const members = await client.organizations.members();
+    check('members of the active organization are readable', members.length === 1);
+
+    const live = await client.me.fetch();
+    check(
+      'the live profile beats the token snapshot',
+      live.user?.firstName === 'Renamed',
+    );
+
+    await client.signOut();
+    check(
+      'signed out, the org list is empty rather than an error',
+      (await client.organizations.list()).length === 0,
+    );
   }
 
   console.log('\n\x1b[1mHosted handoff\x1b[0m');

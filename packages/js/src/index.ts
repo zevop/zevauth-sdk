@@ -3,6 +3,12 @@ export { SignInFlow } from './flows/sign-in';
 export { SignUpFlow } from './flows/sign-up';
 export { PasswordResetFlow } from './flows/password-reset';
 export {
+  OrganizationsFlow,
+  type OrganizationMember,
+  type OrganizationMembership,
+} from './flows/organizations';
+export { UserFlow } from './flows/user';
+export {
   ZevAuthError,
   type ActiveOrganization,
   type EnvironmentConfig,

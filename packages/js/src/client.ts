@@ -8,6 +8,8 @@ import {
 import { SignInFlow, type SessionResponse } from './flows/sign-in';
 import { SignUpFlow } from './flows/sign-up';
 import { PasswordResetFlow } from './flows/password-reset';
+import { OrganizationsFlow } from './flows/organizations';
+import { UserFlow } from './flows/user';
 import {
   ZevAuthError,
   type ActiveOrganization,
@@ -47,6 +49,9 @@ export class ZevAuth {
   readonly signIn: SignInFlow;
   readonly signUp: SignUpFlow;
   readonly passwordReset: PasswordResetFlow;
+  readonly organizations: OrganizationsFlow;
+  /** The profile as the server has it now, not as the token remembers it. */
+  readonly me: UserFlow;
 
   constructor(options: ZevAuthOptions) {
     if (!options.publishableKey?.startsWith('pk_')) {
@@ -84,6 +89,12 @@ export class ZevAuth {
     this.signIn = new SignInFlow(this.http, adopt);
     this.signUp = new SignUpFlow(this.http, adopt);
     this.passwordReset = new PasswordResetFlow(this.http);
+
+    const token = () => this.getToken();
+    this.organizations = new OrganizationsFlow(this.http, token, (id) =>
+      this.setActiveOrganization(id),
+    );
+    this.me = new UserFlow(this.http, token);
   }
 
   // ── Lifecycle ───────────────────────────────────────────────────
