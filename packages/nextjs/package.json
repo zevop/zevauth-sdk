@@ -1,6 +1,6 @@
 {
   "name": "@zevauth/nextjs",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "ZevAuth for Next.js: middleware, server helpers and components.",
   "keywords": [
     "zevauth",
@@ -57,8 +57,8 @@
     "react-dom": ">=18"
   },
   "dependencies": {
-    "@zevauth/js": "^0.1.0",
-    "@zevauth/react": "^0.1.0",
+    "@zevauth/js": "^0.1.1",
+    "@zevauth/react": "^0.1.1",
     "jose": "^6.1.0"
   },
   "devDependencies": {

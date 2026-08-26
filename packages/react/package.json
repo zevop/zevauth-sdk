@@ -1,6 +1,6 @@
 {
   "name": "@zevauth/react",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "ZevAuth for React: hooks and drop-in authentication components.",
   "keywords": [
     "zevauth",
@@ -53,7 +53,7 @@
     "react-dom": ">=18"
   },
   "dependencies": {
-    "@zevauth/js": "^0.1.0"
+    "@zevauth/js": "^0.1.1"
   },
   "devDependencies": {
     "@types/react": "^19.2.14",
