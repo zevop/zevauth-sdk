@@ -18,6 +18,10 @@ export {
 } from './components/UserProfile.js';
 export { UserButton, type UserButtonProps } from './components/UserButton.js';
 export {
+  OrganizationProfile,
+  type OrganizationProfileProps,
+} from './components/OrganizationProfile.js';
+export {
   OrganizationSwitcher,
   type OrganizationSwitcherProps,
 } from './components/OrganizationSwitcher.js';

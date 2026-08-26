@@ -5,6 +5,11 @@ export {
   type ZevAuthClaims,
 } from './verify.js';
 export {
+  createZevAuthMiddleware,
+  type MiddlewareOptions,
+  type RouteMatcher,
+} from './middleware.js';
+export {
   getAuth,
   requireAuth,
   type ServerAuth,

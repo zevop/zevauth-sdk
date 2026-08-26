@@ -15,6 +15,8 @@ import { useUser } from '../src/hooks/useUser';
 import { SignIn } from '../src/components/SignIn';
 import { UserButton } from '../src/components/UserButton';
 import { readableOn } from '../src/components/Brandable';
+import { OrganizationProfile } from '../src/components/OrganizationProfile';
+import { SignUp } from '../src/components/SignUp';
 
 let passed = 0;
 let failed = 0;
@@ -424,6 +426,80 @@ console.log('\n\x1b[1m<UserButton>\x1b[0m');
     signedIn.includes('aria-haspopup="menu"'),
   );
   check('the menu is closed until asked for', !signedIn.includes('Sign out'));
+}
+
+console.log('\n\x1b[1m<SignUp>\x1b[0m');
+
+{
+  const form = render(
+    clientIn({ loaded: true, user: null, methods: ['password'] }),
+    <SignUp />,
+  );
+  check('it asks for an email and a password', form.includes('Create account'));
+  check(
+    'the password field asks a manager to GENERATE one, not fill the old',
+    form.includes('autoComplete="new-password"') ||
+      form.includes('autocomplete="new-password"'),
+  );
+  check('the name is optional, and says so', form.includes('Optional'));
+
+  const nothing = render(
+    clientIn({ loaded: true, user: null, methods: [] }),
+    <SignUp />,
+  );
+  check(
+    'an environment with nothing enabled says so',
+    nothing.includes('No sign-up methods are enabled'),
+  );
+}
+
+console.log('\n\x1b[1m<OrganizationProfile>\x1b[0m');
+
+{
+  const personal = render(
+    clientIn({ loaded: true, user: USER, organization: null }),
+    <OrganizationProfile />,
+  );
+  check(
+    'a personal session is told to switch first',
+    personal.includes('not acting as an organization'),
+  );
+
+  const asAdmin = render(
+    clientIn({
+      loaded: true,
+      user: USER,
+      organization: {
+        id: 'org_1',
+        name: 'Acme',
+        slug: 'acme',
+        role: 'admin',
+        permissions: ['org:members:manage'],
+      },
+    }),
+    <OrganizationProfile />,
+  );
+  check('an admin is offered the add form', asAdmin.includes('Add a member'));
+  check('and the organization is named', asAdmin.includes('Acme'));
+
+  const asMember = render(
+    clientIn({
+      loaded: true,
+      user: USER,
+      organization: {
+        id: 'org_1',
+        name: 'Acme',
+        slug: 'acme',
+        role: 'member',
+        permissions: [],
+      },
+    }),
+    <OrganizationProfile />,
+  );
+  check(
+    'an ordinary member is not offered it',
+    !asMember.includes('Add a member'),
+  );
 }
 
 console.log(

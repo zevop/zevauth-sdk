@@ -48,6 +48,13 @@ export class Http {
     return this.send<T>('PATCH', path, body, init);
   }
 
+  async delete<T>(
+    path: string,
+    init: { accessToken?: string | null } = {},
+  ): Promise<T> {
+    return this.send<T>('DELETE', path, undefined, init);
+  }
+
   async get<T>(
     path: string,
     init: { accessToken?: string | null } = {},

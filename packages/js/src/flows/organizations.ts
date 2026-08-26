@@ -58,6 +58,52 @@ export class OrganizationsFlow {
   }
 
   /**
+   * Adds somebody to the active organization, by the address they signed
+   * up with.
+   *
+   * Requires `org:members:manage`, checked server-side against the live
+   * membership rather than the token's claims — an admin demoted a
+   * minute ago still carries the old ones.
+   */
+  async addMember(params: { email: string; role?: string }): Promise<void> {
+    const accessToken = await this.getToken();
+    if (!accessToken) return;
+
+    await this.http.post('/v1/me/organization/members', params, {
+      accessToken,
+    });
+  }
+
+  async setMemberRole(params: {
+    userId: string;
+    role: string;
+  }): Promise<void> {
+    const accessToken = await this.getToken();
+    if (!accessToken) return;
+
+    await this.http.patch(
+      `/v1/me/organization/members/${encodeURIComponent(params.userId)}`,
+      { role: params.role },
+      { accessToken },
+    );
+  }
+
+  /**
+   * Removes somebody. Anybody may remove themselves; removing anyone
+   * else needs the permission. The last owner cannot be removed either
+   * way, or the organization would be left with nobody to administer it.
+   */
+  async removeMember(params: { userId: string }): Promise<void> {
+    const accessToken = await this.getToken();
+    if (!accessToken) return;
+
+    await this.http.delete(
+      `/v1/me/organization/members/${encodeURIComponent(params.userId)}`,
+      { accessToken },
+    );
+  }
+
+  /**
    * Makes one active, rotating the session's tokens.
    *
    * `null` returns to personal scope. The tokens change because the
