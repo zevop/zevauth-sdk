@@ -1,7 +1,27 @@
 {
   "name": "@zevauth/react",
-  "version": "0.0.1",
-  "description": "ZevAuth for React: hooks and drop-in components.",
+  "version": "0.1.0",
+  "description": "ZevAuth for React: hooks and drop-in authentication components.",
+  "keywords": [
+    "zevauth",
+    "authentication",
+    "auth",
+    "react",
+    "hooks",
+    "components",
+    "sso"
+  ],
+  "license": "MIT",
+  "author": "ZevOp",
+  "homepage": "https://docs.zevauth.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zevop/zevauth-sdk.git",
+    "directory": "packages/react"
+  },
+  "bugs": {
+    "url": "https://github.com/zevop/zevauth-sdk/issues"
+  },
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
@@ -13,9 +33,16 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md"
   ],
   "sideEffects": false,
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsc -b",
     "typecheck": "tsc -b",
@@ -26,7 +53,7 @@
     "react-dom": ">=18"
   },
   "dependencies": {
-    "@zevauth/js": "0.0.1"
+    "@zevauth/js": "^0.1.0"
   },
   "devDependencies": {
     "@types/react": "^19.2.14",

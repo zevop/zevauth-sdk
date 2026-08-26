@@ -1,5 +1,24 @@
 export { ZevAuthProvider, type ZevAuthProviderProps } from './provider.js';
 
+/**
+ * The component stylesheet, as a string.
+ *
+ * The components inject this themselves on first render, which is right
+ * for an ordinary client app. A server-rendered page needs it in the
+ * HTML instead: waiting for hydration to style a sign-in box means a
+ * flash of unstyled markup, and if hydration is delayed or fails the box
+ * never gets styled at all.
+ *
+ * Render it once, with `componentStyleId` as the element's id. The
+ * runtime injector looks for that id and skips when it is already
+ * present, so the two cannot both add it.
+ *
+ * ```tsx
+ * <style id={componentStyleId} dangerouslySetInnerHTML={{ __html: componentStyles }} />
+ * ```
+ */
+export { componentStyles, componentStyleId } from './internal/styles.js';
+
 export { useZevAuth } from './hooks/useZevAuth.js';
 export { useUser, type UseUser } from './hooks/useUser.js';
 export { useAuth, type UseAuth } from './hooks/useAuth.js';
@@ -36,6 +55,9 @@ export {
 
 // Re-exported so an app never has to depend on both packages just to
 // name a type in its own code.
+// The client type, for anything that constructs or holds one — a test
+// harness, a documentation preview, an app that builds its own.
+export type { ZevAuth, ZevAuthOptions } from '@zevauth/js';
 export type {
   ActiveOrganization,
   Branding,

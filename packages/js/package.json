@@ -1,7 +1,26 @@
 {
   "name": "@zevauth/js",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "ZevAuth for the browser. Framework agnostic.",
+  "keywords": [
+    "zevauth",
+    "authentication",
+    "auth",
+    "sso",
+    "jwt",
+    "sessions"
+  ],
+  "license": "MIT",
+  "author": "ZevOp",
+  "homepage": "https://docs.zevauth.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zevop/zevauth-sdk.git",
+    "directory": "packages/js"
+  },
+  "bugs": {
+    "url": "https://github.com/zevop/zevauth-sdk/issues"
+  },
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
@@ -13,9 +32,16 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "README.md"
   ],
   "sideEffects": false,
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsc -b",
     "typecheck": "tsc -b",
