@@ -1,4 +1,18 @@
-import { createRemoteJWKSet, jwtVerify, type JWTPayload } from 'jose';
+/*
+ * Narrow imports, not the `jose` root.
+ *
+ * The root entry re-exports everything, including JWE decryption, which
+ * reaches `CompressionStream` — a Web API the Edge runtime does not
+ * provide. Next.js then warns on every build of every app that uses our
+ * middleware, about a code path none of them execute.
+ *
+ * We verify signatures and fetch a key set. Importing exactly those two
+ * leaves the rest out of the bundle, so the warning goes away because
+ * the code does.
+ */
+import { createRemoteJWKSet } from 'jose/jwks/remote';
+import { jwtVerify } from 'jose/jwt/verify';
+import type { JWTPayload } from 'jose';
 
 /**
  * Verifying a ZevAuth token on the server, without calling ZevAuth.

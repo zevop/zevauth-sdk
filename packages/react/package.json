@@ -1,6 +1,6 @@
 {
   "name": "@zevauth/react",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "ZevAuth for React: hooks and drop-in authentication components.",
   "keywords": [
     "zevauth",
@@ -30,7 +30,8 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
-    }
+    },
+    "./package.json": "./package.json"
   },
   "files": [
     "dist",
@@ -53,7 +54,7 @@
     "react-dom": ">=18"
   },
   "dependencies": {
-    "@zevauth/js": "^0.1.1"
+    "@zevauth/js": "^0.1.2"
   },
   "devDependencies": {
     "@types/react": "^19.2.14",

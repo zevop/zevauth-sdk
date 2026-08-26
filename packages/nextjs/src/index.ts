@@ -10,8 +10,67 @@
  * instead of the "useState is not a function" error that sends people to
  * search for a Next.js bug that is not one.
  *
+ * ── Why these are named exports and not `export *` ────────────────
+ * Next.js refuses `export *` across a client boundary outright: the
+ * build fails with "It's currently unsupported to use export * in a
+ * client boundary". It has to enumerate what crosses, because the
+ * boundary is a serialisation contract rather than a module re-export.
+ *
+ * So the list is written out. It costs a line per symbol and a build
+ * that works, which the previous version did not — this package was
+ * unusable in the app router until an example app tried it.
+ *
  * Server helpers live at `@zevauth/nextjs/server` — a separate entry so
  * nothing in this file, and no browser API it touches, is ever pulled
  * into a server bundle.
  */
-export * from '@zevauth/react';
+export {
+  ZevAuthProvider,
+  SignIn,
+  SignInWithZevId,
+  SignUp,
+  UserButton,
+  UserProfile,
+  OrganizationProfile,
+  OrganizationSwitcher,
+  SignedIn,
+  SignedOut,
+  ZevAuthLoading,
+  Protect,
+  useAuth,
+  useOrganization,
+  useOrganizationList,
+  useUser,
+  useZevAuth,
+  componentStyleId,
+  componentStyles,
+  ZevAuthError,
+} from '@zevauth/react';
+
+/*
+ * Types cross the boundary freely — they do not exist at runtime, so the
+ * client-boundary rule does not apply to them.
+ */
+export type {
+  ZevAuthProviderProps,
+  SignInProps,
+  SignInWithZevIdProps,
+  SignUpProps,
+  UserButtonProps,
+  UserProfileProps,
+  OrganizationProfileProps,
+  OrganizationSwitcherProps,
+  ProtectProps,
+  UseAuth,
+  UseUser,
+  UseOrganization,
+  UseOrganizationList,
+  ActiveOrganization,
+  Branding,
+  OrganizationMember,
+  OrganizationMembership,
+  SignInMethod,
+  ZevAuthState,
+  ZevAuthUser,
+  ZevAuth,
+} from '@zevauth/react';
