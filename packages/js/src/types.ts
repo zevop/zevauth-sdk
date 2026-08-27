@@ -19,6 +19,8 @@ export interface ActiveOrganization {
   id: string;
   name: string;
   slug: string | null;
+  /** The organization's picture, or null. Uploaded or linked. */
+  imageUrl: string | null;
   role: string;
   /**
    * What this member may do.

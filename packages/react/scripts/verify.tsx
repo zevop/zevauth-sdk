@@ -101,6 +101,17 @@ function clientIn(state: {
   Object.defineProperty(client, 'environmentId', {
     get: () => 'env_test_x',
   });
+  Object.defineProperty(client, 'me', {
+    get: () => ({
+      fetch: async () => ({ user: null, organizations: [], organization: null }),
+      update: async () => null,
+      changePassword: async () => ({ otherSessionsRevoked: 0 }),
+      requestEmailChange: async ({ newEmail }: { newEmail: string }) => ({
+        pendingEmail: newEmail,
+      }),
+      cancelEmailChange: async () => {},
+    }),
+  });
   client.load = async () => {};
 
   return client;
@@ -484,6 +495,24 @@ console.log('\n\x1b[1m<UserProfile> sections\x1b[0m');
   );
   check('profile alone omits the password section', !profileOnly.includes('Change password'));
   check('and keeps the name fields', profileOnly.includes('First name'));
+
+  check(
+    'the current address is shown, read-only',
+    /zv-input[^>]*readonly/i.test(both) || both.includes('readOnly'),
+  );
+  check(
+    'changing it is offered as a flow, not an editable field',
+    both.includes('Change your email address'),
+  );
+  check(
+    'and those fields start folded and out of the tab order',
+    (both.match(/data-open="false"/g) ?? []).length >= 2 && /inert/.test(both),
+    `${(both.match(/data-open="false"/g) ?? []).length} folded sections`,
+  );
+  check(
+    'the copy says the address does not change until the link is opened',
+    /does not change[\s\S]{0,40}until you open it/.test(both),
+  );
 
   const securityOnly = render(
     clientIn({ loaded: true, user: USER }),

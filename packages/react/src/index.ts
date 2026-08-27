@@ -18,6 +18,12 @@ export { ZevAuthProvider, type ZevAuthProviderProps } from './provider.js';
  * ```
  */
 export { componentStyles, componentStyleId } from './internal/styles.js';
+/*
+ * Exported so a developer building their own settings screen gets the
+ * same picture control our components use, rather than reimplementing
+ * the hash-upload-save dance around `uploadAvatar`.
+ */
+export { ImageField, type ImageFieldProps } from './components/ImageField.js';
 
 export { useZevAuth } from './hooks/useZevAuth.js';
 export { useUser, type UseUser } from './hooks/useUser.js';

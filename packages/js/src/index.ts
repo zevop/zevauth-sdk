@@ -19,6 +19,10 @@ export {
   type ZevAuthUser,
 } from './types.js';
 export type { SessionStorageAdapter } from './internal/tokens.js';
+export type {
+  AssetPurpose,
+  UploadImageOptions,
+} from './internal/upload.js';
 
 import { ZevAuth, type ZevAuthOptions } from './client.js';
 

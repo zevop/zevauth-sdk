@@ -4,6 +4,7 @@ import type { OrganizationMember } from '@zevauth/js';
 import { useZevAuthContext } from '../internal/context.js';
 import { Brandable } from './Brandable.js';
 import { Alert, Spinner } from './parts.js';
+import { ImageField } from './ImageField.js';
 
 export interface OrganizationProfileProps {
   className?: string;
@@ -36,6 +37,27 @@ export function OrganizationProfile({ className }: OrganizationProfileProps) {
   const organization = state.organization;
   const canManage = (organization?.permissions ?? []).includes(
     'org:members:manage',
+  );
+  /*
+   * A different permission from managing members, and the server agrees.
+   * Some organizations want people who can invite colleagues without
+   * being able to change the name and picture that appear on every
+   * screen in the product.
+   */
+  const canManageOrg = (organization?.permissions ?? []).includes('org:manage');
+
+  /*
+   * Held locally as well as on `state.organization`.
+   *
+   * The active organization comes from the token, which is refreshed at
+   * most every fifteen minutes. Without this, a picture would upload
+   * successfully, save successfully, and then not appear until the token
+   * caught up — which reads as the save having silently failed.
+   */
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  useEffect(
+    () => setImageUrl(organization?.imageUrl ?? null),
+    [organization?.imageUrl],
   );
 
   const refresh = useCallback(async () => {
@@ -100,6 +122,24 @@ export function OrganizationProfile({ className }: OrganizationProfileProps) {
         </h1>
 
         {error ? <Alert>{error}</Alert> : null}
+
+        {canManageOrg ? (
+          <div className="zv-fields">
+            <ImageField
+              label="Organization image"
+              shape="square"
+              value={imageUrl}
+              upload={(file, onProgress) =>
+                client.organizations.uploadImage({ file, onProgress })
+              }
+              onSave={(url) =>
+                client.organizations
+                  .update({ imageUrl: url })
+                  .then((updated) => setImageUrl(updated.imageUrl))
+              }
+            />
+          </div>
+        ) : null}
 
         {canManage ? (
           <form className="zv-fields" onSubmit={onAdd}>

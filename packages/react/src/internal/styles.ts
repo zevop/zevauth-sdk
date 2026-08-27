@@ -26,7 +26,7 @@
 
 const STYLE_ID = 'zevauth-components';
 
-const CSS = `
+const AUTHORED = `
 .zv-root {
   --zv-radius: 8px;
   --zv-bg: #ffffff;
@@ -100,6 +100,7 @@ const CSS = `
 .zv-root.zv-root .zv-menu-label { color: var(--zv-muted); }
 .zv-root.zv-root .zv-menu-item { color: var(--zv-text); }
 .zv-root.zv-root .zv-input { color: var(--zv-text); }
+.zv-root.zv-root .zv-image-preview { color: var(--zv-muted); }
 .zv-root.zv-root .zv-button[data-variant='primary'] { color: var(--zv-on-accent); }
 .zv-root.zv-root .zv-button[data-variant='secondary'] { color: var(--zv-text); }
 .zv-root.zv-root .zv-button[data-variant='ghost'] { color: var(--zv-muted); }
@@ -187,6 +188,75 @@ const CSS = `
 
 .zv-hint { font-size: 11.5px; color: var(--zv-muted); }
 .zv-fielderror { font-size: 11.5px; color: var(--zv-error); }
+
+/*
+ * The picture row: a preview, then the actions beside it.
+ *
+ * Wraps rather than shrinking. In a narrow card the buttons drop under
+ * the preview, which is legible; a preview squeezed to nothing beside
+ * two buttons is not.
+ */
+.zv-image-field {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.zv-image-preview {
+  flex: none;
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid var(--zv-border);
+  /* Derived, not a new token: it has to be a touch off the card in
+     both themes, and mixing the border into the surface does that
+     without another variable to keep in step. */
+  background: color-mix(in srgb, var(--zv-border) 30%, var(--zv-surface));
+}
+.zv-image-preview[data-shape='circle'] { border-radius: 999px; }
+.zv-image-preview[data-shape='square'] { border-radius: var(--zv-radius); }
+.zv-image-preview img { width: 100%; height: 100%; object-fit: cover; }
+/* The placeholder silhouette. Stroked, so it reads at 56px. */
+.zv-image-preview svg {
+  width: 26px;
+  height: 26px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  opacity: .6;
+}
+.zv-image-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 160px;
+  flex: 1;
+}
+.zv-image-buttons { display: flex; gap: 8px; flex-wrap: wrap; }
+/*
+ * The buttons here size to their text. Every other button in these
+ * components is full width because it is the one action on a form; two
+ * side by side would each be half a card wide and read as a choice
+ * between equals, which Replace and Remove are not.
+ */
+.zv-image-buttons .zv-button { width: auto; padding: 7px 12px; font-size: 12.5px; }
+
+.zv-progress {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--zv-border);
+  overflow: hidden;
+}
+.zv-progress span {
+  display: block;
+  height: 100%;
+  background: var(--zv-accent);
+  transition: width .15s ease;
+}
 
 .zv-button {
   display: inline-flex;
@@ -363,6 +433,28 @@ const CSS = `
   .zv-input, .zv-button { transition: none; }
 }
 `;
+
+/**
+ * The authored CSS, minus the explanations.
+ *
+ * The comments above are for whoever maintains this. They were shipping
+ * to every visitor of every page that renders a component: 3.1kB of
+ * rationale, 24% of the stylesheet, on an auth screen that should be
+ * fast. Stripping happens once per process, so the source stays
+ * readable and the bytes stay home.
+ *
+ * Deliberately conservative. It removes block comments and collapses
+ * runs of whitespace, and does not touch spacing around punctuation —
+ * `color-mix(in srgb, var(--zv-accent) 22%, transparent)` is one bad
+ * regex away from breaking, and the saving is not worth the risk.
+ *
+ * This assumes no CSS string or `url()` contains the sequence that ends
+ * a comment. None does; if one ever must, it needs escaping or this
+ * needs a real parser.
+ */
+const CSS = AUTHORED.replace(/\/\*[\s\S]*?\*\//g, '')
+  .replace(/\s+/g, ' ')
+  .trim();
 
 let injected = false;
 

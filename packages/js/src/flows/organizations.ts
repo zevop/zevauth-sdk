@@ -1,8 +1,8 @@
 import type { Http } from '../internal/http.js';
-import type { ActiveOrganization } from '../types.js';
+import { ZevAuthError, type ActiveOrganization } from '../types.js';
+import { uploadImage, type UploadImageOptions } from '../internal/upload.js';
 
 export interface OrganizationMembership extends ActiveOrganization {
-  imageUrl: string | null;
   permissions?: string[];
 }
 
@@ -42,6 +42,53 @@ export class OrganizationsFlow {
     }>('/v1/me/organizations', { accessToken });
 
     return response.organizations;
+  }
+
+  /**
+   * Renames the active organization, or changes its image.
+   *
+   * Needs the `org:manage` permission, checked against the caller's LIVE
+   * membership rather than the token's claims. A demotion takes effect
+   * immediately, not at the next token refresh.
+   *
+   * Pass `imageUrl: null` to remove the image. Leaving the field out
+   * leaves the image alone, which is a different thing.
+   */
+  async update(patch: {
+    name?: string;
+    imageUrl?: string | null;
+  }): Promise<Pick<ActiveOrganization, 'id' | 'name' | 'slug' | 'imageUrl'>> {
+    const accessToken = await this.getToken();
+    if (!accessToken) {
+      throw new ZevAuthError('Nobody is signed in.', 'not_authenticated', 401);
+    }
+
+    const response = await this.http.patch<{
+      organization: Pick<ActiveOrganization, 'id' | 'name' | 'slug' | 'imageUrl'>;
+    }>('/v1/me/organization', patch, { accessToken });
+
+    return response.organization;
+  }
+
+  /**
+   * Uploads an organization image and returns the URL.
+   *
+   * It does NOT save it — pass the result to `update({ imageUrl })`.
+   * Two steps so the picture can be shown and confirmed before it
+   * becomes the one everybody in the organization sees.
+   */
+  async uploadImage(options: UploadImageOptions): Promise<string> {
+    const accessToken = await this.getToken();
+    if (!accessToken) {
+      throw new ZevAuthError('Nobody is signed in.', 'not_authenticated', 401);
+    }
+
+    return uploadImage({
+      http: this.http,
+      accessToken,
+      purpose: 'organization_image',
+      options,
+    });
   }
 
   /** Who else is in the organization this session is acting as. */

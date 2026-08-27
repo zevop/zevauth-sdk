@@ -1,8 +1,9 @@
-import { useEffect, useState, type FormEvent } from "react";
-import { ZevAuthError } from "@zevauth/js";
-import { useZevAuthContext } from "../internal/context.js";
-import { Brandable } from "./Brandable.js";
-import { Alert, Spinner } from "./parts.js";
+import { useEffect, useState, type FormEvent } from 'react';
+import { ZevAuthError } from '@zevauth/js';
+import { useZevAuthContext } from '../internal/context.js';
+import { Brandable } from './Brandable.js';
+import { Alert, Spinner } from './parts.js';
+import { ImageField } from './ImageField.js';
 
 export interface UserProfileProps {
   /**
@@ -13,7 +14,7 @@ export interface UserProfileProps {
    * own settings screen. A settings area with its own navigation should
    * not be forced to show both under one heading.
    */
-  section?: "all" | "profile" | "security";
+  section?: 'all' | 'profile' | 'security';
   /**
    * Whether the password fields start open.
    *
@@ -27,30 +28,41 @@ export interface UserProfileProps {
 }
 
 /**
- * Self-service: name, avatar and password.
+ * Self-service: name, email and password.
  *
- * ── What is not here, and why it is not an oversight ──────────────
- * There is no email field. Moving an account to a new address has to be
- * proved before it takes effect, or anybody who finds an unlocked laptop
- * can move somebody's account somewhere they control. That is a flow
- * with its own verification, not a text input, and pretending otherwise
- * in the UI would invite exactly the endpoint we refused to build.
+ * ── Why the email field is a flow, not an input ───────────────────
+ * Typing a new address does not change anything. A link goes to that
+ * address and the account keeps its current one until the link is
+ * opened, because anybody who finds an unlocked laptop could otherwise
+ * move an account somewhere they control, and every recovery path would
+ * follow them there.
+ *
+ * So the field submits a REQUEST, the UI says a confirmation is on its
+ * way, and a pending change can be cancelled. The current address stays
+ * on screen throughout, because it is still the address on the account.
  */
 export function UserProfile({
-  section = "all",
+  section = 'all',
   defaultPasswordOpen = false,
   className,
 }: UserProfileProps) {
-  const { client, state } = useZevAuthContext("<UserProfile>");
+  const { client, state } = useZevAuthContext('<UserProfile>');
 
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [profileError, setProfileError] = useState<string | null>(null);
   const [savedProfile, setSavedProfile] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
 
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
+  const [newEmail, setNewEmail] = useState('');
+  const [emailPassword, setEmailPassword] = useState('');
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [pendingEmail, setPendingEmail] = useState<string | null>(null);
+  const [isSavingEmail, setIsSavingEmail] = useState(false);
+  const [isEmailOpen, setIsEmailOpen] = useState(false);
+
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [revoked, setRevoked] = useState<number | null>(null);
   const [isSavingPassword, setIsSavingPassword] = useState(false);
@@ -66,8 +78,8 @@ export function UserProfile({
      * render, and an uncontrolled field would keep the empty string it
      * mounted with.
      */
-    setFirstName(user?.firstName ?? "");
-    setLastName(user?.lastName ?? "");
+    setFirstName(user?.firstName ?? '');
+    setLastName(user?.lastName ?? '');
   }, [user?.firstName, user?.lastName]);
 
   if (!state.isLoaded || !user) return null;
@@ -83,7 +95,7 @@ export function UserProfile({
       .then(() => setSavedProfile(true))
       .catch((err) =>
         setProfileError(
-          err instanceof ZevAuthError ? err.message : "Could not save.",
+          err instanceof ZevAuthError ? err.message : 'Could not save.',
         ),
       )
       .finally(() => setIsSavingProfile(false));
@@ -102,7 +114,7 @@ export function UserProfile({
         setPasswordError(
           err instanceof ZevAuthError
             ? err.message
-            : "Could not change your password.",
+            : 'Could not change your password.',
         ),
       )
       .finally(() => {
@@ -112,23 +124,41 @@ export function UserProfile({
          * a password sitting in a field is a password readable by
          * anyone who walks past the screen.
          */
-        setCurrentPassword("");
-        setNewPassword("");
+        setCurrentPassword('');
+        setNewPassword('');
       });
   };
 
   return (
     <Brandable branding={client.branding} className={className}>
       <div className="zv-card" data-size="wide">
-        {section !== "security" ? (
-          <h1 className="zv-title" style={{ textAlign: "left" }}>
+        {section !== 'security' ? (
+          <h1 className="zv-title" style={{ textAlign: 'left' }}>
             Your profile
           </h1>
         ) : null}
 
-        {section !== "security" ? (
+        {section !== 'security' ? (
           <form className="zv-fields" onSubmit={onSaveProfile}>
             {profileError ? <Alert>{profileError}</Alert> : null}
+
+            {/*
+              First, because it is the field people came to change and
+              the only one they can see the result of. It saves on its
+              own rather than waiting for the form's button: an upload
+              has already happened by the time the picture appears, and
+              a Save that seemed to be needed afterwards would be a
+              second, confusing commitment to something already done.
+            */}
+            <ImageField
+              label="Photo"
+              value={user.imageUrl ?? null}
+              isDisabled={isSavingProfile}
+              upload={(file, onProgress) =>
+                client.me.uploadAvatar({ file, onProgress })
+              }
+              onSave={(imageUrl) => client.me.update({ imageUrl })}
+            />
 
             <div className="zv-field">
               <label className="zv-label" htmlFor="zv-profile-first">
@@ -161,18 +191,136 @@ export function UserProfile({
             <div className="zv-field">
               <label className="zv-label">Email</label>
               {/*
-              Shown, not editable. Changing it needs proof, so it lives
-              in its own flow rather than pretending to be a field.
-            */}
+                The address on the account, which is the current one
+                until a change is proved. Not editable in place: the new
+                address is asked for separately, below.
+              */}
               <input
                 className="zv-input"
-                value={user.email ?? ""}
+                value={user.email ?? ''}
                 disabled
                 readOnly
               />
-              <span className="zv-hint">
-                Contact support to change the address on your account.
-              </span>
+
+              {pendingEmail ? (
+                <div className="zv-notice">
+                  Waiting for {pendingEmail} to be confirmed. Nothing changes
+                  until the link we sent there is opened.{' '}
+                  <button
+                    type="button"
+                    className="zv-button"
+                    data-variant="ghost"
+                    style={{ width: 'auto', display: 'inline-flex' }}
+                    onClick={() => {
+                      void client.me.cancelEmailChange().then(() => {
+                        setPendingEmail(null);
+                        setNewEmail('');
+                      });
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className="zv-more"
+                  style={{ justifyContent: 'flex-start', padding: '2px 0' }}
+                  aria-expanded={isEmailOpen}
+                  onClick={() => setIsEmailOpen((open) => !open)}
+                >
+                  Change your email address
+                </button>
+              )}
+            </div>
+
+            {/*
+              Typing a new address changes nothing. A link goes there and
+              the account keeps its current address until that link is
+              opened, or anybody with a borrowed session could move an
+              account somewhere they control and every recovery path
+              would follow them.
+            */}
+            <div
+              className="zv-reveal"
+              data-open={isEmailOpen && !pendingEmail ? 'true' : 'false'}
+              inert={!isEmailOpen || Boolean(pendingEmail)}
+            >
+              <div
+                style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
+              >
+                {emailError ? <Alert>{emailError}</Alert> : null}
+
+                <div className="zv-field">
+                  <label className="zv-label" htmlFor="zv-new-email">
+                    New email address
+                  </label>
+                  <input
+                    id="zv-new-email"
+                    className="zv-input"
+                    type="email"
+                    value={newEmail}
+                    onChange={(e) => setNewEmail(e.target.value)}
+                    disabled={isSavingEmail}
+                    autoComplete="email"
+                  />
+                  <span className="zv-hint">
+                    We will send a link there. Your address does not change
+                    until you open it.
+                  </span>
+                </div>
+
+                <div className="zv-field">
+                  <label className="zv-label" htmlFor="zv-email-password">
+                    Current password
+                  </label>
+                  <input
+                    id="zv-email-password"
+                    className="zv-input"
+                    type="password"
+                    value={emailPassword}
+                    onChange={(e) => setEmailPassword(e.target.value)}
+                    disabled={isSavingEmail}
+                    autoComplete="current-password"
+                  />
+                </div>
+
+                <button
+                  type="button"
+                  className="zv-button"
+                  data-variant="secondary"
+                  disabled={isSavingEmail || !newEmail}
+                  onClick={() => {
+                    setIsSavingEmail(true);
+                    setEmailError(null);
+                    void client.me
+                      .requestEmailChange({
+                        newEmail,
+                        currentPassword: emailPassword || undefined,
+                      })
+                      .then((result) => {
+                        setPendingEmail(result.pendingEmail);
+                        setIsEmailOpen(false);
+                      })
+                      .catch((err) =>
+                        setEmailError(
+                          err instanceof ZevAuthError
+                            ? err.message
+                            : 'Could not request that change.',
+                        ),
+                      )
+                      .finally(() => {
+                        setIsSavingEmail(false);
+                        // Never left in the field, for the same reason
+                        // the password fields are cleared below.
+                        setEmailPassword('');
+                      });
+                  }}
+                >
+                  {isSavingEmail ? <Spinner /> : null}
+                  Send confirmation
+                </button>
+              </div>
             </div>
 
             <button
@@ -182,14 +330,14 @@ export function UserProfile({
               disabled={isSavingProfile}
             >
               {isSavingProfile ? <Spinner /> : null}
-              {savedProfile && !isSavingProfile ? "Saved" : "Save"}
+              {savedProfile && !isSavingProfile ? 'Saved' : 'Save'}
             </button>
           </form>
         ) : null}
 
-        {section === "all" ? <hr className="zv-section-divider" /> : null}
+        {section === 'all' ? <hr className="zv-section-divider" /> : null}
 
-        {section !== "profile" ? (
+        {section !== 'profile' ? (
           <form className="zv-fields" onSubmit={onChangePassword}>
             {/*
             A disclosure, not a heading.
@@ -202,7 +350,7 @@ export function UserProfile({
             <button
               type="button"
               className="zv-more"
-              style={{ justifyContent: "space-between", padding: "4px 0" }}
+              style={{ justifyContent: 'space-between', padding: '4px 0' }}
               aria-expanded={isPasswordOpen}
               onClick={() => setIsPasswordOpen((open) => !open)}
             >
@@ -225,19 +373,19 @@ export function UserProfile({
 
             <div
               className="zv-reveal"
-              data-open={isPasswordOpen ? "true" : "false"}
+              data-open={isPasswordOpen ? 'true' : 'false'}
               inert={!isPasswordOpen}
             >
               <div
-                style={{ display: "flex", flexDirection: "column", gap: 12 }}
+                style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
               >
                 {passwordError ? <Alert>{passwordError}</Alert> : null}
                 {revoked !== null ? (
                   <div className="zv-notice">
                     Password changed.
                     {revoked > 0
-                      ? ` We signed out ${revoked} other ${revoked === 1 ? "session" : "sessions"}.`
-                      : ""}
+                      ? ` We signed out ${revoked} other ${revoked === 1 ? 'session' : 'sessions'}.`
+                      : ''}
                   </div>
                 ) : null}
 

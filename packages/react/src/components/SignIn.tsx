@@ -1,7 +1,7 @@
-import { useState, type FormEvent } from "react";
-import { ZevAuthError } from "@zevauth/js";
-import { useZevAuthContext } from "../internal/context.js";
-import { Brandable } from "./Brandable.js";
+import { useState, type FormEvent } from 'react';
+import { ZevAuthError } from '@zevauth/js';
+import { useZevAuthContext } from '../internal/context.js';
+import { Brandable } from './Brandable.js';
 import {
   Alert,
   Divider,
@@ -10,7 +10,7 @@ import {
   Spinner,
   TestModeBadge,
   ZevMark,
-} from "./parts.js";
+} from './parts.js';
 
 export interface SignInProps {
   /** Where to send somebody after a successful sign-in. */
@@ -27,16 +27,16 @@ export interface SignInProps {
    * choice is yours because it depends on which method you actually
    * want people to reach for.
    */
-  secondaryMethods?: "inline" | "collapsed";
+  secondaryMethods?: 'inline' | 'collapsed';
   /** Rendered instead of the form once somebody is signed in. */
   children?: React.ReactNode;
   className?: string;
 }
 
 type Stage =
-  | { name: "credentials" }
-  | { name: "code-sent"; email: string }
-  | { name: "link-sent"; email: string };
+  | { name: 'credentials' }
+  | { name: 'code-sent'; email: string }
+  | { name: 'link-sent'; email: string };
 
 /**
  * A complete sign-in box.
@@ -55,16 +55,16 @@ type Stage =
  */
 export function SignIn({
   afterSignInUrl,
-  secondaryMethods = "inline",
+  secondaryMethods = 'inline',
   children,
   className,
 }: SignInProps) {
-  const { client, state } = useZevAuthContext("<SignIn>");
+  const { client, state } = useZevAuthContext('<SignIn>');
 
-  const [identifier, setIdentifier] = useState("");
-  const [password, setPassword] = useState("");
-  const [code, setCode] = useState("");
-  const [stage, setStage] = useState<Stage>({ name: "credentials" });
+  const [identifier, setIdentifier] = useState('');
+  const [password, setPassword] = useState('');
+  const [code, setCode] = useState('');
+  const [stage, setStage] = useState<Stage>({ name: 'credentials' });
   const [showMore, setShowMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
@@ -72,13 +72,13 @@ export function SignIn({
   const branding = client.branding;
   const methods = client.signInMethods;
 
-  const hasPassword = methods.includes("password");
-  const hasMagicLink = methods.includes("magic_link");
-  const hasEmailCode = methods.includes("email_otp");
-  const hasZevId = methods.includes("zevid");
+  const hasPassword = methods.includes('password');
+  const hasMagicLink = methods.includes('magic_link');
+  const hasEmailCode = methods.includes('email_otp');
+  const hasZevId = methods.includes('zevid');
 
   if (state.isLoaded && state.user) {
-    if (afterSignInUrl && typeof window !== "undefined") {
+    if (afterSignInUrl && typeof window !== 'undefined') {
       window.location.assign(afterSignInUrl);
     }
     return <>{children ?? null}</>;
@@ -98,7 +98,7 @@ export function SignIn({
       setError(
         err instanceof ZevAuthError
           ? err.message
-          : "Something went wrong. Please try again.",
+          : 'Something went wrong. Please try again.',
       );
     } finally {
       setIsBusy(false);
@@ -113,18 +113,18 @@ export function SignIn({
   const onSendCode = () =>
     void run(async () => {
       await client.signIn.startEmailCode({ email: identifier });
-      setStage({ name: "code-sent", email: identifier });
+      setStage({ name: 'code-sent', email: identifier });
     });
 
   const onSendLink = () =>
     void run(async () => {
       await client.signIn.startMagicLink({ email: identifier });
-      setStage({ name: "link-sent", email: identifier });
+      setStage({ name: 'link-sent', email: identifier });
     });
 
   const onVerifyCode = (event: FormEvent) => {
     event.preventDefault();
-    if (stage.name !== "code-sent") return;
+    if (stage.name !== 'code-sent') return;
     void run(() => client.signIn.verifyEmailCode({ email: stage.email, code }));
   };
 
@@ -134,7 +134,7 @@ export function SignIn({
         {client.isTestMode ? <TestModeBadge /> : null}
         <Identity branding={branding} />
 
-        {stage.name === "link-sent" ? (
+        {stage.name === 'link-sent' ? (
           <>
             <h1 className="zv-title">Check your email</h1>
             <p className="zv-subtitle">
@@ -144,12 +144,12 @@ export function SignIn({
               type="button"
               className="zv-button"
               data-variant="ghost"
-              onClick={() => setStage({ name: "credentials" })}
+              onClick={() => setStage({ name: 'credentials' })}
             >
               Use something else
             </button>
           </>
-        ) : stage.name === "code-sent" ? (
+        ) : stage.name === 'code-sent' ? (
           <>
             <h1 className="zv-title">Enter your code</h1>
             <p className="zv-subtitle">
@@ -188,7 +188,7 @@ export function SignIn({
               type="button"
               className="zv-button"
               data-variant="ghost"
-              onClick={() => setStage({ name: "credentials" })}
+              onClick={() => setStage({ name: 'credentials' })}
             >
               Use something else
             </button>
@@ -280,7 +280,7 @@ export function SignIn({
               through lands on buttons they cannot see.
             */}
             {(hasMagicLink || hasEmailCode) && hasPassword ? (
-              secondaryMethods === "collapsed" ? (
+              secondaryMethods === 'collapsed' ? (
                 <button
                   type="button"
                   className="zv-more"
@@ -329,12 +329,12 @@ export function SignIn({
               <div
                 className="zv-reveal"
                 data-open={
-                  secondaryMethods === "inline" || showMore ? "true" : "false"
+                  secondaryMethods === 'inline' || showMore ? 'true' : 'false'
                 }
-                inert={secondaryMethods === "collapsed" && !showMore}
+                inert={secondaryMethods === 'collapsed' && !showMore}
               >
                 <div
-                  style={{ display: "flex", flexDirection: "column", gap: 12 }}
+                  style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
                 >
                   {hasMagicLink ? (
                     <button
@@ -373,7 +373,7 @@ export function SignIn({
                   onClick={() =>
                     void run(async () => {
                       await client.passwordReset.start({ email: identifier });
-                      setStage({ name: "link-sent", email: identifier });
+                      setStage({ name: 'link-sent', email: identifier });
                     })
                   }
                 >
