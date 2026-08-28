@@ -155,3 +155,72 @@ export function Heading({
     </>
   );
 }
+
+/** Where the form sits. `split-left` puts the FORM on the left. */
+export type SignInLayout = 'centered' | 'split-left' | 'split-right';
+
+/**
+ * The page around the card.
+ *
+ * ── Why this is not the developer's job ──────────────────────────
+ * A split sign-in screen is what most products in this category ship,
+ * and building one around our card means reimplementing the card to
+ * match: the same surface colour, the same radius, the same dark-mode
+ * rule, kept in step by hand. Putting the layout inside the component
+ * means the two halves cannot drift.
+ *
+ * ── What goes in the other half ──────────────────────────────────
+ * Either a picture with a heading and a line of copy, set in the
+ * console by somebody who is not going to open an editor, or arbitrary
+ * JSX passed as `aside`. The prop wins: code is the more specific
+ * instruction, and a developer who wrote a panel did not write it to be
+ * overridden from a settings page.
+ *
+ * The aside is hidden below 900px rather than stacked. Stacking pushes
+ * the form below the fold on a phone, which is the one place the form
+ * has to be the first thing.
+ */
+export function Shell({
+  layout,
+  aside,
+  children,
+}: {
+  layout: SignInLayout;
+  aside: ReactNode;
+  children: ReactNode;
+}) {
+  if (layout === 'centered') return <>{children}</>;
+
+  return (
+    <div className="zv-split" data-form={layout === 'split-left' ? 'left' : 'right'}>
+      <div className="zv-aside">{aside}</div>
+      <div className="zv-formpane">{children}</div>
+    </div>
+  );
+}
+
+/**
+ * The console-configured aside: a picture, a heading, a line of text.
+ *
+ * Returns null when nothing is set, so an empty panel still paints the
+ * accent rather than rendering an empty box with a stray gradient.
+ */
+export function BrandedAside({ branding }: { branding: Branding | null }) {
+  if (!branding) return null;
+  const { asideImageUrl, asideHeading, asideText } = branding;
+  if (!asideImageUrl && !asideHeading && !asideText) return null;
+
+  return (
+    <>
+      {asideImageUrl ? (
+        <img className="zv-aside-image" src={asideImageUrl} alt="" />
+      ) : null}
+      {asideHeading || asideText ? (
+        <div className="zv-aside-body">
+          {asideHeading ? <p className="zv-aside-heading">{asideHeading}</p> : null}
+          {asideText ? <p className="zv-aside-text">{asideText}</p> : null}
+        </div>
+      ) : null}
+    </>
+  );
+}

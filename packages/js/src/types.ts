@@ -92,6 +92,15 @@ export interface Branding {
   signInTitle?: string | null;
   signInSubtitle?: string | null;
   signUpTitle?: string | null;
+
+  /**
+   * Where the form sits on the page, and what fills the space beside
+   * it. Set in the console; `<SignIn layout=… aside=… />` overrides it.
+   */
+  signInLayout?: 'centered' | 'split_left' | 'split_right';
+  asideImageUrl?: string | null;
+  asideHeading?: string | null;
+  asideText?: string | null;
   signUpSubtitle?: string | null;
   accentColor: string | null;
   /** Contrast-corrected for each surface. Never re-derive these. */

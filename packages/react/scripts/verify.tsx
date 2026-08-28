@@ -348,6 +348,58 @@ console.log('\n\x1b[1m<SignIn> renders what is ENABLED\x1b[0m');
   );
 }
 
+console.log('\n\x1b[1mSplit sign-in screens\x1b[0m');
+
+{
+  const base = { loaded: true, user: null, methods: ['email_password'] } as const;
+
+  const centered = render(clientIn({ ...base }), <SignIn />);
+  check('centered is still the default, so no existing screen moves', !centered.includes('zv-split'));
+
+  const right = render(clientIn({ ...base }), <SignIn layout="split-right" />);
+  check('a split renders the two panes', right.includes('zv-split') && right.includes('zv-formpane'));
+  check('and says which side the FORM is on', right.includes('data-form="right"'), right.slice(0, 200));
+
+  const left = render(clientIn({ ...base }), <SignIn layout="split-left" />);
+  check('the form can go on the left instead', left.includes('data-form="left"'));
+
+  // The console can choose it without the developer touching code.
+  const fromConsole = render(
+    clientIn({ ...base, branding: { signInLayout: 'split_right' } }),
+    <SignIn />,
+  );
+  check('the console setting alone is enough', fromConsole.includes('data-form="right"'));
+
+  const overridden = render(
+    clientIn({ ...base, branding: { signInLayout: 'split_right' } }),
+    <SignIn layout="centered" />,
+  );
+  check('and the prop still wins over it', !overridden.includes('zv-split'));
+
+  const branded = render(
+    clientIn({
+      ...base,
+      branding: {
+        signInLayout: 'split_right',
+        asideImageUrl: 'https://cdn.example/a.png',
+        asideHeading: 'Built for teams',
+        asideText: 'One balance, every tool.',
+      },
+    }),
+    <SignIn />,
+  );
+  check('the console picture and copy fill the panel', branded.includes('Built for teams') && branded.includes('One balance, every tool.'));
+
+  const custom = render(
+    clientIn({ ...base, branding: { signInLayout: 'split_right', asideHeading: 'From the console' } }),
+    <SignIn aside={<p>From the code</p>} />,
+  );
+  check(
+    'JSX passed as `aside` replaces the console copy rather than joining it',
+    custom.includes('From the code') && !custom.includes('From the console'),
+  );
+}
+
 console.log('\n\x1b[1mWhere the ZevID button sits\x1b[0m');
 
 {

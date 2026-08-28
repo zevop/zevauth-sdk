@@ -148,6 +148,86 @@ const AUTHORED = `
  */
 .zv-card[data-size='wide'] { width: 460px; }
 
+/*
+ * The split screen: form on one side, a picture on the other.
+ *
+ * \`data-form\` names where the FORM goes, because that is the thing a
+ * developer is positioning. The aside is rendered first and flipped
+ * with \`order\`, so the markup stays one shape rather than two branches
+ * that can disagree.
+ *
+ * \`100dvh\` rather than \`100vh\`: on mobile browsers \`vh\` includes the
+ * address bar that is not there, so the form sat below the fold until
+ * you scrolled.
+ */
+.zv-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  min-height: 100dvh;
+  width: 100%;
+}
+.zv-split[data-form='left'] .zv-aside { order: 2; }
+.zv-formpane {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 20px;
+}
+.zv-aside {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 44px 40px;
+  background: var(--zv-accent);
+  color: var(--zv-on-accent);
+}
+.zv-aside-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+/* A scrim, so the copy stays readable over any photograph rather than
+   only over the ones that happen to be dark at the bottom. */
+.zv-aside-body::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(0,0,0,.62), rgba(0,0,0,0) 55%);
+  pointer-events: none;
+}
+.zv-aside-body { position: relative; }
+.zv-root.zv-root .zv-aside-heading {
+  position: relative;
+  margin: 0;
+  font-size: 23px;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.015em;
+  color: inherit;
+}
+.zv-root.zv-root .zv-aside-text {
+  position: relative;
+  margin: 8px 0 0;
+  font-size: 13.5px;
+  line-height: 1.55;
+  opacity: 0.88;
+  color: inherit;
+}
+/*
+ * Hidden below 900px, not stacked. Stacking puts the picture above the
+ * form, which pushes the one thing somebody came to do below the fold
+ * on the smallest screens.
+ */
+@media (max-width: 900px) {
+  .zv-split { grid-template-columns: 1fr; min-height: 0; }
+  .zv-aside { display: none; }
+  .zv-formpane { padding: 24px 16px; }
+}
+
 .zv-identity { display: flex; flex-direction: column; align-items: center; gap: 8px; }
 .zv-logo { max-height: 30px; max-width: 170px; object-fit: contain; }
 .zv-appname { font-size: 12.5px; color: var(--zv-muted); }

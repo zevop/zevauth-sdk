@@ -1,16 +1,19 @@
-import { useState, type FormEvent } from 'react';
+import { useState, type FormEvent, type ReactNode } from 'react';
 import { ZevAuthError } from '@zevauth/js';
 import { useZevAuthContext } from '../internal/context.js';
 import { Brandable } from './Brandable.js';
 import {
   Alert,
+  BrandedAside,
   Divider,
   Heading,
   Identity,
+  Shell,
   PoweredBy,
   Spinner,
   TestModeBadge,
   ZevMark,
+  type SignInLayout,
 } from './parts.js';
 
 export interface SignInProps {
@@ -29,6 +32,22 @@ export interface SignInProps {
    * want people to reach for.
    */
   secondaryMethods?: 'inline' | 'collapsed';
+
+  /**
+   * Where the form sits. Defaults to whatever the console is set to,
+   * so a developer who has not asked for anything gets the centered
+   * card they already had.
+   */
+  layout?: SignInLayout;
+
+  /**
+   * What fills the other half of a split screen.
+   *
+   * Overrides the picture and copy set in the console: passing JSX is a
+   * more specific instruction than a settings page, and somebody who
+   * wrote a panel did not write it to be replaced from elsewhere.
+   */
+  aside?: ReactNode;
   /** Rendered instead of the form once somebody is signed in. */
   children?: React.ReactNode;
   className?: string;
@@ -57,6 +76,8 @@ type Stage =
 export function SignIn({
   afterSignInUrl,
   secondaryMethods = 'inline',
+  layout,
+  aside,
   children,
   className,
 }: SignInProps) {
@@ -93,6 +114,17 @@ export function SignIn({
    * is still the default, so no existing screen moves unless its
    * developer asks.
    */
+  /*
+   * Stored as `split_left`, read as `split-left`. The API keeps the
+   * underscore because that is what the column holds; the prop takes a
+   * hyphen because that is what a React prop looks like everywhere
+   * else. Converting once here beats asking a developer to remember
+   * which surface uses which.
+   */
+  const resolvedLayout: SignInLayout =
+    layout ??
+    ((branding?.signInLayout?.replace('_', '-') as SignInLayout) ?? 'centered');
+
   const zevIdIsSecondary =
     hasZevId && hasPassword && secondaryMethods === 'collapsed';
 
@@ -149,6 +181,10 @@ export function SignIn({
 
   return (
     <Brandable branding={branding} className={className}>
+      <Shell
+        layout={resolvedLayout}
+        aside={aside ?? <BrandedAside branding={branding} />}
+      >
       <div className="zv-card">
         {client.isTestMode ? <TestModeBadge /> : null}
         <Identity branding={branding} />
@@ -452,6 +488,7 @@ export function SignIn({
           <PoweredBy environmentId={client.environmentId} />
         ) : null}
       </div>
+      </Shell>
     </Brandable>
   );
 }
