@@ -140,11 +140,26 @@ export class SignInFlow {
      * discards any path already on the base, so an `apiUrl` of
      * `https://example.com/zevauth` would have lost the `/zevauth`.
      */
-    const query = params.redirectUrl
-      ? `?redirect_url=${encodeURIComponent(params.redirectUrl)}`
-      : '';
+    /*
+     * The key travels in the URL, and it has to.
+     *
+     * This is a full page navigation, which is the entire point: the
+     * person leaves for the consent screen. A navigation cannot carry an
+     * `Authorization` header, so every other call in this SDK sends the
+     * key as one and this single method cannot. Without it the endpoint
+     * answered 401 and the button landed people on raw JSON.
+     *
+     * A publishable key already ships inside this bundle, so a URL
+     * exposes nothing that reading the JavaScript would not. The API
+     * accepts it here and only here, and refuses a secret key outright.
+     */
+    const query = new URLSearchParams({
+      publishable_key: this.http.publishableKey,
+    });
+    if (params.redirectUrl) query.set('redirect_url', params.redirectUrl);
+
     globalThis.location.assign(
-      `${this.http.baseUrl}/v1/auth/zevid/start${query}`,
+      `${this.http.baseUrl}/v1/auth/zevid/start?${query}`,
     );
   }
 }

@@ -5,6 +5,7 @@ import { Brandable } from './Brandable.js';
 import {
   Alert,
   Divider,
+  Heading,
   Identity,
   PoweredBy,
   Spinner,
@@ -76,6 +77,24 @@ export function SignIn({
   const hasMagicLink = methods.includes('magic_link');
   const hasEmailCode = methods.includes('email_otp');
   const hasZevId = methods.includes('zevid');
+
+  /*
+   * Where the ZevID button goes.
+   *
+   * It used to be pinned above the form with no way to move it, and
+   * `secondaryMethods` did not reach it: the prop only governed magic
+   * link and email code, so an environment with just a password and
+   * ZevID found it did nothing at all. For a product whose users are
+   * mostly existing customers with a password, that put the primary
+   * path second on the screen.
+   *
+   * `collapsed` now means what it says: the form first, and everything
+   * else behind the toggle, ZevID included. `inline` is unchanged and
+   * is still the default, so no existing screen moves unless its
+   * developer asks.
+   */
+  const zevIdIsSecondary =
+    hasZevId && hasPassword && secondaryMethods === 'collapsed';
 
   if (state.isLoaded && state.user) {
     if (afterSignInUrl && typeof window !== 'undefined') {
@@ -195,10 +214,14 @@ export function SignIn({
           </>
         ) : (
           <>
-            <h1 className="zv-title">Sign in</h1>
+            <Heading
+              title={branding?.signInTitle}
+              subtitle={branding?.signInSubtitle}
+              fallbackTitle="Sign in"
+            />
             {error ? <Alert>{error}</Alert> : null}
 
-            {hasZevId ? (
+            {hasZevId && !zevIdIsSecondary ? (
               <>
                 <button
                   type="button"
@@ -279,7 +302,8 @@ export function SignIn({
               the tab order while they are hidden, or somebody tabbing
               through lands on buttons they cannot see.
             */}
-            {(hasMagicLink || hasEmailCode) && hasPassword ? (
+            {(hasMagicLink || hasEmailCode || zevIdIsSecondary) &&
+            hasPassword ? (
               secondaryMethods === 'collapsed' ? (
                 <button
                   type="button"
@@ -325,7 +349,7 @@ export function SignIn({
               </div>
             ) : null}
 
-            {hasMagicLink || hasEmailCode ? (
+            {hasMagicLink || hasEmailCode || zevIdIsSecondary ? (
               <div
                 className="zv-reveal"
                 data-open={
@@ -336,6 +360,18 @@ export function SignIn({
                 <div
                   style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
                 >
+                  {zevIdIsSecondary ? (
+                    <button
+                      type="button"
+                      className="zv-button"
+                      data-variant="secondary"
+                      disabled={isBusy}
+                      onClick={() => client.signIn.withZevId()}
+                    >
+                      <ZevMark size={13} />
+                      Continue with ZevID
+                    </button>
+                  ) : null}
                   {hasMagicLink ? (
                     <button
                       type="button"
@@ -365,17 +401,32 @@ export function SignIn({
 
             {hasPassword ? (
               <div className="zv-footer">
+                {/*
+                  Enabled even with an empty field, and it says why when
+                  it cannot act.
+
+                  It used to be `disabled` until an address was typed.
+                  The reasoning was sound — the reset needs one — but the
+                  ghost variant's only disabled cue is reduced opacity,
+                  so it was indistinguishable from a dead link and read
+                  as broken. A control that refuses silently teaches
+                  nobody what to do next.
+                */}
                 <button
                   type="button"
                   className="zv-button"
                   data-variant="ghost"
-                  disabled={isBusy || !identifier}
-                  onClick={() =>
+                  disabled={isBusy}
+                  onClick={() => {
+                    if (!identifier.trim()) {
+                      setError('Enter your email address first, then choose this again.');
+                      return;
+                    }
                     void run(async () => {
                       await client.passwordReset.start({ email: identifier });
                       setStage({ name: 'link-sent', email: identifier });
-                    })
-                  }
+                    });
+                  }}
                 >
                   Forgot your password?
                 </button>

@@ -123,3 +123,35 @@ export function Divider({ label }: { label: string }) {
 export function Spinner() {
   return <span className="zv-spinner" aria-hidden="true" />;
 }
+
+/**
+ * The heading and subheading a surface prints.
+ *
+ * Both come from the console. The component supplies a fallback ONLY
+ * for the title, and only when the field is absent entirely, which
+ * means an API older than this feature:
+ *
+ *   undefined  the API never sent it   -> our built-in wording
+ *   null       the developer hid it    -> print nothing
+ *   a string   the developer wrote it  -> print that
+ *
+ * Collapsing those two into one falsy check is the whole bug this
+ * shape exists to avoid.
+ */
+export function Heading({
+  title,
+  subtitle,
+  fallbackTitle,
+}: {
+  title: string | null | undefined;
+  subtitle: string | null | undefined;
+  fallbackTitle: string;
+}) {
+  const heading = title === undefined ? fallbackTitle : title;
+  return (
+    <>
+      {heading ? <h1 className="zv-title">{heading}</h1> : null}
+      {subtitle ? <p className="zv-subtitle">{subtitle}</p> : null}
+    </>
+  );
+}

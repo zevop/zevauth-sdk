@@ -79,6 +79,20 @@ export interface Branding {
    * names nobody cannot be told apart from a phishing page.
    */
   showIdentity?: boolean;
+  /**
+   * The words above each form, decided in the console and resolved
+   * server-side. `null` means print nothing.
+   *
+   * `undefined` is different from `null` and the distinction matters:
+   * an API that predates these fields sends neither, and the components
+   * fall back to their built-in wording. Treating absent as "print
+   * nothing" would strip the heading off every app that upgraded this
+   * package before the backend shipped.
+   */
+  signInTitle?: string | null;
+  signInSubtitle?: string | null;
+  signUpTitle?: string | null;
+  signUpSubtitle?: string | null;
   accentColor: string | null;
   /** Contrast-corrected for each surface. Never re-derive these. */
   accentOnLight: string;

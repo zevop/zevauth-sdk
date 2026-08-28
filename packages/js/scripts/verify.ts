@@ -458,8 +458,13 @@ async function main() {
 
       check(
         `apiUrl "${apiUrl}" redirects to ${expected}`,
-        threw === null && assigned === expected,
+        threw === null && assigned.startsWith(expected),
         threw ?? assigned,
+      );
+      check(
+        `and carries the publishable key, which a navigation cannot put in a header`,
+        assigned.includes('publishable_key=pk_test_abc'),
+        assigned,
       );
       delete (globalThis as any).location;
     }
@@ -479,8 +484,9 @@ async function main() {
       client.signIn.withZevId({ redirectUrl: 'https://app.example.com/after?a=1&b=2' });
       check(
         'the return URL is encoded rather than pasted in raw',
-        assigned ===
-          '/zevauth/v1/auth/zevid/start?redirect_url=https%3A%2F%2Fapp.example.com%2Fafter%3Fa%3D1%26b%3D2',
+        assigned.includes(
+          'redirect_url=https%3A%2F%2Fapp.example.com%2Fafter%3Fa%3D1%26b%3D2',
+        ) && assigned.startsWith('/zevauth/v1/auth/zevid/start?'),
         assigned,
       );
       delete (globalThis as any).location;

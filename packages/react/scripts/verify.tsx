@@ -348,6 +348,110 @@ console.log('\n\x1b[1m<SignIn> renders what is ENABLED\x1b[0m');
   );
 }
 
+console.log('\n\x1b[1mWhere the ZevID button sits\x1b[0m');
+
+{
+  const both = { loaded: true, user: null, methods: ['email_password', 'zevid'] } as const;
+
+  const inline = render(clientIn({ ...both }), <SignIn />);
+  const zevIdBeforeForm =
+    inline.indexOf('Continue with ZevID') < inline.indexOf('type="password"');
+  check('inline keeps ZevID above the form, as it always has', zevIdBeforeForm, 'order changed');
+
+  /*
+   * The reported bug: with only a password and ZevID enabled, the prop
+   * did nothing, because its condition asked for magic link or email
+   * code. A product whose users mostly have passwords had no way to put
+   * the form first.
+   */
+  const collapsed = render(
+    clientIn({ ...both }),
+    <SignIn secondaryMethods="collapsed" />,
+  );
+  check(
+    'collapsed puts the form first and ZevID after it',
+    collapsed.indexOf('type="password"') < collapsed.indexOf('Continue with ZevID'),
+    'ZevID is still first',
+  );
+  check('and offers the toggle', collapsed.includes('More options'));
+  check('with ZevID folded away behind it', collapsed.includes('data-open="false"'));
+  check('but still rendered, so the toggle can animate', collapsed.includes('Continue with ZevID'));
+
+  // Nothing to be secondary TO means nothing moves.
+  const zevIdOnly = render(
+    clientIn({ loaded: true, user: null, methods: ['zevid'] }),
+    <SignIn secondaryMethods="collapsed" />,
+  );
+  check(
+    'ZevID alone stays primary, with no toggle hiding the only way in',
+    zevIdOnly.includes('Continue with ZevID') && !zevIdOnly.includes('More options'),
+  );
+}
+
+console.log('\n\x1b[1mThe words above the form\x1b[0m');
+
+{
+  const custom = render(
+    clientIn({
+      loaded: true,
+      user: null,
+      methods: ['email_password'],
+      branding: { signInTitle: 'Log in to Andapool', signInSubtitle: 'Welcome back.' },
+    }),
+    <SignIn />,
+  );
+  check('the title comes from the console', custom.includes('Log in to Andapool'), custom.slice(0, 200));
+  check('and so does the subtitle', custom.includes('Welcome back.'));
+  // Scoped to the heading: the submit button still reads "Sign in",
+  // and it should.
+  check(
+    'the heading is the custom one, not ours',
+    custom.includes('zv-title">Log in to Andapool') && !custom.includes('zv-title">Sign in<'),
+    custom.slice(0, 240),
+  );
+
+  const hidden = render(
+    clientIn({
+      loaded: true,
+      user: null,
+      methods: ['email_password'],
+      branding: { signInTitle: null, signInSubtitle: null },
+    }),
+    <SignIn />,
+  );
+  check('a null title prints no heading at all', !hidden.includes('zv-title'));
+  check('and no subtitle', !hidden.includes('zv-subtitle'));
+  check('while the form stays', hidden.includes('type="password"'));
+
+  /*
+   * The distinction that matters: absent is not the same as null. An
+   * API older than this feature sends neither field, and the component
+   * has to keep printing its own wording rather than going blank.
+   */
+  const legacy = render(
+    clientIn({
+      loaded: true,
+      user: null,
+      methods: ['email_password'],
+      branding: { signInTitle: undefined, signInSubtitle: undefined },
+    }),
+    <SignIn />,
+  );
+  check('an API that sends neither field still prints the default title', legacy.includes('Sign in'));
+
+  const signUp = render(
+    clientIn({
+      loaded: true,
+      user: null,
+      methods: ['email_password'],
+      branding: { signUpTitle: 'Join Andapool', signUpSubtitle: 'It takes a minute.' },
+    }),
+    <SignUp />,
+  );
+  check('sign-up takes its own title', signUp.includes('Join Andapool'), signUp.slice(0, 200));
+  check('and its own subtitle', signUp.includes('It takes a minute.'));
+}
+
 console.log('\n\x1b[1mHiding the logo and name\x1b[0m');
 
 {

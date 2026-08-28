@@ -22,8 +22,18 @@ export class Http {
   /** The API root. Exposed so redirect flows can build absolute URLs. */
   readonly baseUrl: string;
 
+  /**
+   * Exposed for the one flow that leaves the page.
+   *
+   * A navigation cannot send an `Authorization` header, so
+   * `withZevId()` puts the key in the URL instead. Safe because a
+   * publishable key is already in this bundle.
+   */
+  readonly publishableKey: string;
+
   constructor(private readonly options: HttpOptions) {
     this.baseUrl = options.baseUrl;
+    this.publishableKey = options.publishableKey;
     /*
      * Bound to `globalThis`. Extracting `fetch` from the global and
      * calling it unbound throws "Illegal invocation" in browsers, which

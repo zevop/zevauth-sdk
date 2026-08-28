@@ -5,6 +5,7 @@ import { Brandable } from './Brandable.js';
 import {
   Alert,
   Divider,
+  Heading,
   Identity,
   PoweredBy,
   Spinner,
@@ -94,7 +95,11 @@ export function SignUp({ afterSignUpUrl, children, className }: SignUpProps) {
           </>
         ) : (
           <>
-            <h1 className="zv-title">Create your account</h1>
+            <Heading
+              title={client.branding?.signUpTitle}
+              subtitle={client.branding?.signUpSubtitle}
+              fallbackTitle="Create your account"
+            />
             {error ? <Alert>{error}</Alert> : null}
 
             {hasZevId ? (
