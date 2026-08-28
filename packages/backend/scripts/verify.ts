@@ -242,6 +242,46 @@ async function main() {
     );
 
     calls.length = 0;
+    await zev.users.list({ metadata: { type: 'seller', tier: 2 } });
+    check(
+      'a metadata filter is flattened to the bracketed form the API reads',
+      calls[0].url.includes('metadata%5Btype%5D=seller'),
+      calls[0].url,
+    );
+    check(
+      'and non-string values are stringified rather than dropped',
+      calls[0].url.includes('metadata%5Btier%5D=2'),
+      calls[0].url,
+    );
+
+    calls.length = 0;
+    await zev.sandbox.mintToken('usr_1');
+    check(
+      'minting a token is a POST to the user\'s sandbox route',
+      calls[0].method === 'POST' &&
+        calls[0].url.endsWith('/v1/sandbox/users/usr_1/tokens'),
+      `${calls[0].method} ${calls[0].url}`,
+    );
+
+    calls.length = 0;
+    await zev.sandbox.emails({ to: 'ada@example.com' });
+    check(
+      'captured mail is a GET with the recipient as a query parameter',
+      calls[0].method === 'GET' &&
+        calls[0].url.includes('/v1/sandbox/emails') &&
+        calls[0].url.includes('to=ada%40example.com'),
+      `${calls[0].method} ${calls[0].url}`,
+    );
+
+    calls.length = 0;
+    await zev.sandbox.resetUsers();
+    check(
+      'resetting users is a DELETE',
+      calls[0].method === 'DELETE' && calls[0].url.endsWith('/v1/sandbox/users'),
+      `${calls[0].method} ${calls[0].url}`,
+    );
+
+    calls.length = 0;
     await zev.users.setBlocked('usr_1', true);
     check('blocking is a POST with the flag', calls[0].method === 'POST' &&
       (calls[0].body as { blocked: boolean }).blocked === true);

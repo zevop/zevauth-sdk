@@ -1,4 +1,5 @@
 import { Http } from './http.js';
+import { Sandbox } from './sandbox.js';
 import { Users } from './users.js';
 import { Organizations } from './organizations.js';
 import { ZevAuthError } from './errors.js';
@@ -6,6 +7,12 @@ import { ZevAuthError } from './errors.js';
 export { ZevAuthError } from './errors.js';
 export { Users, type CreateUserParams, type UpdateUserParams } from './users.js';
 export { Organizations } from './organizations.js';
+export {
+  Sandbox,
+  type CapturedEmail,
+  type MintedSession,
+  type EnvironmentInfo,
+} from './sandbox.js';
 export type {
   OrganizationMember,
   Page,
@@ -61,6 +68,8 @@ export interface ZevAuthBackendOptions {
 export class ZevAuthBackend {
   readonly users: Users;
   readonly organizations: Organizations;
+  /** Test-environment helpers. Every call is refused with a live key. */
+  readonly sandbox: Sandbox;
 
   constructor(options: ZevAuthBackendOptions) {
     if (!options.secretKey) {
@@ -99,6 +108,7 @@ export class ZevAuthBackend {
 
     this.users = new Users(http);
     this.organizations = new Organizations(http);
+    this.sandbox = new Sandbox(http);
   }
 }
 

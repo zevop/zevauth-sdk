@@ -34,6 +34,11 @@ that cannot be undone.
 
 - `users` — list, get, create, update, block, revoke sessions, delete
 - `organizations` — list, get, create, update, delete, add and remove members
+- `sandbox` — mint a token without a password, read captured email, reset users
+  between CI runs. Test environments only; the API refuses a live key.
+
+`users.list({ metadata: { type: 'seller' } })` filters by the `publicMetadata`
+fields you set, which is how you fetch one kind of user.
 
 Full reference at [docs.zevauth.com](https://docs.zevauth.com/sdk/backend/).
 

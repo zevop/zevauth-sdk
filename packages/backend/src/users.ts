@@ -51,12 +51,38 @@ export class Users {
    *   cursor = page.next;
    * } while (cursor);
    * ```
+   *
+   * `metadata` filters on top-level `publicMetadata` fields, which is how
+   * you fetch one kind of user:
+   *
+   * ```ts
+   * const sellers = await zevauth.users.list({ metadata: { type: 'seller' } });
+   * ```
+   *
+   * Several keys are combined with AND. Values go over the wire as text,
+   * so a stored `true` and a stored `"true"` both match `'true'`.
    */
-  list(params: { limit?: number; after?: string; query?: string } = {}) {
+  list(
+    params: {
+      limit?: number;
+      after?: string;
+      query?: string;
+      metadata?: Record<string, string | number | boolean>;
+    } = {},
+  ) {
     return this.http.get<Page<ZevAuthUser>>('/v1/users', {
       limit: params.limit,
       after: params.after,
       query: params.query,
+      // Flattened to `metadata[key]` here rather than left to the query
+      // serialiser: the API reads the bracketed form, and every HTTP
+      // client spells nested objects differently.
+      ...Object.fromEntries(
+        Object.entries(params.metadata ?? {}).map(([key, value]) => [
+          `metadata[${key}]`,
+          String(value),
+        ]),
+      ),
     });
   }
 
