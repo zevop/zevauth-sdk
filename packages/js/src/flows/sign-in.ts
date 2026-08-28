@@ -125,10 +125,26 @@ export class SignInFlow {
    * registered, carrying a code the SDK exchanges on load.
    */
   withZevId(params: { redirectUrl?: string } = {}): void {
-    const url = new URL('/v1/auth/zevid/start', this.http.baseUrl);
-    if (params.redirectUrl) {
-      url.searchParams.set('redirect_url', params.redirectUrl);
-    }
-    globalThis.location.assign(url.toString());
+    /*
+     * Built by concatenation, exactly as every fetch in this SDK builds
+     * its URL, and NOT with `new URL(path, base)`.
+     *
+     * `apiUrl` is allowed to be relative — a dev server proxying
+     * `/zevauth` to us is the documented way to work around a corporate
+     * proxy or to keep requests same-origin. `new URL` requires an
+     * ABSOLUTE base and throws `Invalid base URL` on a relative one, so
+     * this line took down the ZevID button for anybody using that
+     * setup, while every other call in the client kept working.
+     *
+     * It was wrong for absolute bases too: a leading-slash path
+     * discards any path already on the base, so an `apiUrl` of
+     * `https://example.com/zevauth` would have lost the `/zevauth`.
+     */
+    const query = params.redirectUrl
+      ? `?redirect_url=${encodeURIComponent(params.redirectUrl)}`
+      : '';
+    globalThis.location.assign(
+      `${this.http.baseUrl}/v1/auth/zevid/start${query}`,
+    );
   }
 }

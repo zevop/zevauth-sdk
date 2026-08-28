@@ -26,6 +26,23 @@ export function ZevMark({ size = 11 }: { size?: number }) {
 export function Identity({ branding }: { branding: Branding | null }) {
   if (!branding) return null;
 
+  /*
+   * Turned off from the console by a developer whose own page already
+   * shows their logo above where they mount this. Two logos, one under
+   * the other, is the most common thing people report about embedding
+   * these components, and it is not something a prop should decide:
+   * the person changing the branding is in the console, not the code.
+   *
+   * Hosted pages ignore this and always render — see the note in
+   * hosted.controller.ts.
+   *
+   * Tested against `false` rather than for truthiness on purpose. An
+   * API that predates this field sends nothing, and treating absent as
+   * "hide" would delete the logo of every app that upgraded this
+   * package before the backend shipped it.
+   */
+  if (branding.showIdentity === false) return null;
+
   const showName = !branding.logoUrl || branding.showAppName;
 
   return (

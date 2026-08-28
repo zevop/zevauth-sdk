@@ -41,12 +41,28 @@ export interface ZevAuthSession {
   organization: ActiveOrganization | null;
 }
 
+/*
+ * These are the API's own keys, verbatim.
+ *
+ * `email_password` rather than `password` is not a style choice: it is
+ * what `GET /v1/environment` sends, and this union used to say
+ * `password`. Nothing matched, so `<SignIn />` and `<SignUp />` decided
+ * the developer had no email sign-in enabled and rendered only their
+ * social buttons — for every project, with no error anywhere.
+ *
+ * Add to this list only by copying a key out of the API response.
+ */
 export type SignInMethod =
-  | 'password'
+  | 'email_password'
   | 'magic_link'
   | 'email_otp'
+  | 'phone_otp'
   | 'username'
-  | 'zevid';
+  | 'passkey'
+  | 'zevid'
+  | 'google'
+  | 'github'
+  | 'apple';
 
 /** The developer's brand, resolved server-side and ready to paint. */
 export interface Branding {
@@ -54,6 +70,15 @@ export interface Branding {
   logoUrl: string | null;
   /** Whether the name prints under the logo. Always true with no logo. */
   showAppName: boolean;
+  /**
+   * Whether the logo and name appear above the form at all.
+   *
+   * Set in the console. Turn it off when your own page already shows
+   * them above the component, so they are not shown twice. Hosted pages
+   * always send true: with no page of yours around them, a screen that
+   * names nobody cannot be told apart from a phishing page.
+   */
+  showIdentity?: boolean;
   accentColor: string | null;
   /** Contrast-corrected for each surface. Never re-derive these. */
   accentOnLight: string;

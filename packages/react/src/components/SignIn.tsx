@@ -72,7 +72,7 @@ export function SignIn({
   const branding = client.branding;
   const methods = client.signInMethods;
 
-  const hasPassword = methods.includes('password');
+  const hasPassword = methods.includes('email_password');
   const hasMagicLink = methods.includes('magic_link');
   const hasEmailCode = methods.includes('email_otp');
   const hasZevId = methods.includes('zevid');

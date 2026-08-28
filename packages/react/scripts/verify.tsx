@@ -52,7 +52,7 @@ const USER = {
 const BRANDING = {
   appName: 'Northwind',
   logoUrl: null,
-  showAppName: true,
+  showAppName: true, showIdentity: true,
   accentColor: '#2563eb',
   accentOnLight: '#2563eb',
   accentOnDark: '#7ba4f5',
@@ -307,7 +307,7 @@ console.log('\n\x1b[1m<SignIn> renders what is ENABLED\x1b[0m');
 
 {
   const passwordOnly = render(
-    clientIn({ loaded: true, user: null, methods: ['password'] }),
+    clientIn({ loaded: true, user: null, methods: ['email_password'] }),
     <SignIn />,
   );
   check('a password form is offered', passwordOnly.includes('type="password"'));
@@ -330,7 +330,7 @@ console.log('\n\x1b[1m<SignIn> renders what is ENABLED\x1b[0m');
     clientIn({
       loaded: true,
       user: null,
-      methods: ['password', 'magic_link', 'email_otp', 'zevid'],
+      methods: ['email_password', 'magic_link', 'email_otp', 'zevid'],
     }),
     <SignIn />,
   );
@@ -348,11 +348,43 @@ console.log('\n\x1b[1m<SignIn> renders what is ENABLED\x1b[0m');
   );
 }
 
+console.log('\n\x1b[1mHiding the logo and name\x1b[0m');
+
+{
+  const off = render(
+    clientIn({
+      loaded: true,
+      user: null,
+      methods: ['email_password'],
+      branding: { showIdentity: false },
+    }),
+    <SignIn />,
+  );
+  check('the identity block is gone when it is turned off', !off.includes('zv-identity'));
+  check('but the form is still there', off.includes('type="password"'), off.slice(0, 160));
+
+  /*
+   * An API that predates this field sends nothing. Absent has to mean
+   * "show", or upgrading this package before the backend ships would
+   * delete the logo of every app that took the update.
+   */
+  const legacy = render(
+    clientIn({
+      loaded: true,
+      user: null,
+      methods: ['email_password'],
+      branding: { showIdentity: undefined },
+    }),
+    <SignIn />,
+  );
+  check('an API that does not send the field still shows the identity', legacy.includes('zv-identity'));
+}
+
 console.log('\n\x1b[1mBranding and attribution\x1b[0m');
 
 {
   const branded = render(
-    clientIn({ loaded: true, user: null, methods: ['password'] }),
+    clientIn({ loaded: true, user: null, methods: ['email_password'] }),
     <SignIn />,
   );
   check('the accent is applied as a CSS variable', branded.includes('--zv-accent'));
@@ -374,7 +406,7 @@ console.log('\n\x1b[1mBranding and attribution\x1b[0m');
     clientIn({
       loaded: true,
       user: null,
-      methods: ['password'],
+      methods: ['email_password'],
       branding: { showPoweredBy: false },
     }),
     <SignIn />,
@@ -388,7 +420,7 @@ console.log('\n\x1b[1mBranding and attribution\x1b[0m');
     clientIn({
       loaded: true,
       user: null,
-      methods: ['password'],
+      methods: ['email_password'],
       branding: { logoUrl: 'https://cdn.test/logo.svg', showAppName: false },
     }),
     <SignIn />,
@@ -400,7 +432,7 @@ console.log('\n\x1b[1mBranding and attribution\x1b[0m');
   );
 
   const testMode = render(
-    clientIn({ loaded: true, user: null, methods: ['password'], isTestMode: true }),
+    clientIn({ loaded: true, user: null, methods: ['email_password'], isTestMode: true }),
     <SignIn />,
   );
   check('test mode is called out', testMode.includes('Test mode'));
@@ -419,7 +451,10 @@ check(
 console.log('\n\x1b[1mSecondary methods: inline vs collapsed\x1b[0m');
 
 {
-  const all = { loaded: true, user: null, methods: ['password', 'magic_link', 'email_otp'] };
+  // `email_password` is the API's key. These fixtures said `password`
+  // and so did the component, so they agreed with each other and neither
+  // agreed with the wire — which is why a broken sign-in box passed.
+  const all = { loaded: true, user: null, methods: ['email_password', 'magic_link', 'email_otp'] };
 
   const inline = render(clientIn(all), <SignIn />);
   check('inline is the default', inline.includes('data-open="true"'));
@@ -443,7 +478,7 @@ console.log('\n\x1b[1mSecondary methods: inline vs collapsed\x1b[0m');
 
   // With only one method there is nothing to fold, so no toggle.
   const onlyPassword = render(
-    clientIn({ loaded: true, user: null, methods: ['password'] }),
+    clientIn({ loaded: true, user: null, methods: ['email_password'] }),
     <SignIn secondaryMethods="collapsed" />,
   );
   check(
@@ -551,7 +586,7 @@ console.log('\n\x1b[1m<SignUp>\x1b[0m');
 
 {
   const form = render(
-    clientIn({ loaded: true, user: null, methods: ['password'] }),
+    clientIn({ loaded: true, user: null, methods: ['email_password'] }),
     <SignUp />,
   );
   check('it asks for an email and a password', form.includes('Create account'));

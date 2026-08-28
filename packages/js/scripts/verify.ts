@@ -419,6 +419,74 @@ async function main() {
     );
   }
 
+  console.log('\n\x1b[1mThe ZevID redirect\x1b[0m');
+
+  {
+    /*
+     * `apiUrl` is allowed to be relative, and this is the only place in
+     * the SDK that ever built a URL with `new URL(path, base)` — which
+     * requires an absolute base and throws on a relative one. The button
+     * did nothing but log `Invalid base URL`, while every other call in
+     * the same client worked, because they all concatenate.
+     */
+    for (const [apiUrl, expected] of [
+      ['https://api.test', 'https://api.test/v1/auth/zevid/start'],
+      // A dev server proxying to us. This is the case that threw.
+      ['/zevauth', '/zevauth/v1/auth/zevid/start'],
+      // A base that already carries a path keeps it.
+      ['https://example.com/zevauth', 'https://example.com/zevauth/v1/auth/zevid/start'],
+    ] as const) {
+      let assigned = '';
+      (globalThis as any).location = {
+        get href() { return 'https://app.example.com/'; },
+        assign(to: string) { assigned = to; },
+      };
+
+      const client = new ZevAuth({
+        publishableKey: 'pk_test_abc',
+        apiUrl,
+        fetch: fakeApi().fetch,
+        storage: memoryStorage(),
+      });
+
+      let threw: string | null = null;
+      try {
+        client.signIn.withZevId();
+      } catch (err) {
+        threw = (err as Error).message;
+      }
+
+      check(
+        `apiUrl "${apiUrl}" redirects to ${expected}`,
+        threw === null && assigned === expected,
+        threw ?? assigned,
+      );
+      delete (globalThis as any).location;
+    }
+
+    {
+      let assigned = '';
+      (globalThis as any).location = {
+        get href() { return 'https://app.example.com/'; },
+        assign(to: string) { assigned = to; },
+      };
+      const client = new ZevAuth({
+        publishableKey: 'pk_test_abc',
+        apiUrl: '/zevauth',
+        fetch: fakeApi().fetch,
+        storage: memoryStorage(),
+      });
+      client.signIn.withZevId({ redirectUrl: 'https://app.example.com/after?a=1&b=2' });
+      check(
+        'the return URL is encoded rather than pasted in raw',
+        assigned ===
+          '/zevauth/v1/auth/zevid/start?redirect_url=https%3A%2F%2Fapp.example.com%2Fafter%3Fa%3D1%26b%3D2',
+        assigned,
+      );
+      delete (globalThis as any).location;
+    }
+  }
+
   console.log('\n\x1b[1mHosted handoff\x1b[0m');
 
   {

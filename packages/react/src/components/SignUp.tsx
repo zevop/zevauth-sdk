@@ -40,7 +40,7 @@ export function SignUp({ afterSignUpUrl, children, className }: SignUpProps) {
   const [awaitingVerification, setAwaitingVerification] = useState(false);
 
   const branding = client.branding;
-  const hasPassword = client.signInMethods.includes('password');
+  const hasPassword = client.signInMethods.includes('email_password');
   const hasZevId = client.signInMethods.includes('zevid');
 
   if (state.isLoaded && state.user) {
