@@ -24,6 +24,12 @@ export class SignUpFlow {
     password?: string;
     firstName?: string;
     lastName?: string;
+    /**
+     * Where the confirmation link should land, instead of our hosted
+     * page. Must be a redirect URL registered under API keys, matched
+     * exactly. The SDK confirms the address on load when it arrives.
+     */
+    redirectUrl?: string;
   }): Promise<{ requiresEmailVerification: boolean }> {
     const response = await this.http.post<
       SessionResponse & { requiresEmailVerification?: boolean }
@@ -39,9 +45,14 @@ export class SignUpFlow {
   }
 
   /** Re-sends the confirmation email. */
-  async resendVerification(params: { email: string }): Promise<void> {
+  async resendVerification(params: {
+    email: string;
+    /** Keep the link inside your app. Must be a registered redirect URL. */
+    redirectUrl?: string;
+  }): Promise<void> {
     await this.http.post('/v1/auth/verify-email/resend', {
       email: params.email,
+      redirectUrl: params.redirectUrl,
     });
   }
 }

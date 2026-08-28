@@ -1,0 +1,55 @@
+{
+  "name": "@zevauth/backend",
+  "version": "0.1.3",
+  "description": "ZevAuth for your server. Manage users and organizations with a secret key.",
+  "keywords": [
+    "zevauth",
+    "authentication",
+    "auth",
+    "admin",
+    "server",
+    "backend"
+  ],
+  "license": "MIT",
+  "author": "ZevOp",
+  "homepage": "https://docs.zevauth.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zevop/zevauth-sdk.git",
+    "directory": "packages/backend"
+  },
+  "bugs": {
+    "url": "https://github.com/zevop/zevauth-sdk/issues"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b",
+    "verify": "tsx scripts/verify.ts"
+  },
+  "devDependencies": {
+    "tsx": "^4.20.6",
+    "typescript": "~5.9.0"
+  }
+}

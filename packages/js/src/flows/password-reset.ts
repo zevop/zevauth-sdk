@@ -13,8 +13,23 @@ export class PasswordResetFlow {
   constructor(private readonly http: Http) {}
 
   /** Emails a reset link. Answers identically for unknown addresses. */
-  async start(params: { email: string }): Promise<void> {
-    await this.http.post('/v1/auth/password-reset', { email: params.email });
+  async start(params: {
+    email: string;
+    /**
+     * Where the reset link should land, instead of our hosted page. Must
+     * be a redirect URL registered under API keys, matched exactly.
+     *
+     * Unlike a magic link, the SDK does NOT finish this one for you: a
+     * reset needs a new password, which means your form. The token
+     * arrives as `zv_token` in the query string and is left there for
+     * you to read and pass to `complete()`.
+     */
+    redirectUrl?: string;
+  }): Promise<void> {
+    await this.http.post('/v1/auth/password-reset', {
+      email: params.email,
+      redirectUrl: params.redirectUrl,
+    });
   }
 
   /**

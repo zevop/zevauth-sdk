@@ -114,6 +114,7 @@ export class ZevAuth {
     this.environment = await this.http.get<EnvironmentConfig>('/v1/environment');
 
     await this.completeHandoffIfPresent();
+    await this.completeEmailLinkIfPresent();
 
     if (!this.tokens.getUser()) {
       // A stored refresh token but no user in memory is the normal state
@@ -342,6 +343,83 @@ export class ZevAuth {
        * `replaceState` removes it without adding a history entry.
        */
       url.searchParams.delete('code');
+      globalThis.history?.replaceState({}, '', url.toString());
+    }
+  }
+
+  /**
+   * Finishes a flow that arrived as a link in an email.
+   *
+   * ── Why this exists alongside the handoff ─────────────────────────
+   * A magic link used to have exactly one destination: our hosted page,
+   * which redeemed the token and bounced the person back here with a
+   * one-time code. That works, and for a developer who has built no
+   * pages of their own it is the right default.
+   *
+   * It is a visible seam for everybody else. An app that has embedded
+   * `<SignIn />` already has a sign-in page, and sending its users
+   * through a zevauth.com screen to get back to it is a stranger's
+   * branding in the middle of somebody's product — on the one flow where
+   * the person is already wondering whether the email was genuine.
+   *
+   * So `startMagicLink({ redirectUrl })` points the link at the app
+   * instead, and this is the other half: on load, the token is spotted,
+   * redeemed here, and the session begins on this origin without the
+   * person going anywhere.
+   *
+   * ── What it deliberately does NOT finish ──────────────────────────
+   * A password reset. That one needs a new password, which means a form,
+   * which means the developer's own UI. The token is left in the URL for
+   * them to read and pass to `passwordReset.complete()`; swallowing it
+   * here would strip the credential their form still needs.
+   */
+  private async completeEmailLinkIfPresent(): Promise<void> {
+    const location = globalThis.location;
+    if (!location) return;
+
+    const url = new URL(location.href);
+    const token = url.searchParams.get('zv_token');
+    const flow = url.searchParams.get('zv_flow');
+    if (!token || !flow) return;
+
+    // Left for the developer's own form. See the note above.
+    if (flow === 'reset-password') return;
+
+    try {
+      if (flow === 'sign-in') {
+        const response = await this.http.post<SessionResponse>(
+          '/v1/auth/magic-link/verify',
+          { token },
+        );
+        this.adopt(response);
+      } else if (flow === 'verify-email') {
+        await this.http.post('/v1/auth/verify-email', { token });
+        /*
+         * No session from this one. Confirming an address is not signing
+         * in: the person may already be signed in on this device, or may
+         * have opened the link on their phone having signed up on a
+         * laptop. `restore()` runs next either way and finds whatever
+         * session actually exists here.
+         */
+      }
+    } catch {
+      /*
+       * Swallowed on purpose. A link is opened once and then sits in an
+       * inbox, so the second visit is expired-or-used, which is normal
+       * rather than exceptional. Throwing out of `load()` would leave the
+       * whole app unmounted over a stale link, when the correct outcome
+       * is simply "you are not signed in".
+       */
+    } finally {
+      /*
+       * The token leaves the URL whether or not it worked, for the same
+       * reason the handoff code does: it is single use, and one left in
+       * the address bar gets bookmarked, pasted into chat, and reported
+       * as "the link stopped working".
+       */
+      url.searchParams.delete('zv_token');
+      url.searchParams.delete('zv_flow');
+      url.searchParams.delete('zv_t');
       globalThis.history?.replaceState({}, '', url.toString());
     }
   }
