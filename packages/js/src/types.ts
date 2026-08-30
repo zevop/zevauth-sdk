@@ -98,10 +98,19 @@ export interface Branding {
    * it. Set in the console; `<SignIn layout=… aside=… />` overrides it.
    */
   signInLayout?: 'centered' | 'split_left' | 'split_right';
+  /** `flat` drops the border, surface and padding so the form blends in. */
+  cardStyle?: 'card' | 'flat';
+  /** Where the form sits vertically in the space it is given. */
+  contentAlign?: 'center' | 'top';
+  /** `dedicated` gives the password reset its own screen and its own field. */
+  passwordResetMode?: 'dedicated' | 'inline';
   asideStyle?: 'gradient' | 'solid' | 'image';
   /** The panel colour. Already falls back to the accent server-side. */
   asideColor?: string | null;
+  /** Used when the surface paints dark. Falls back to the light value. */
+  asideColorDark?: string | null;
   asideImageUrl?: string | null;
+  asideImageUrlDark?: string | null;
   asideHeading?: string | null;
   asideText?: string | null;
   signUpSubtitle?: string | null;
@@ -122,7 +131,40 @@ export interface EnvironmentConfig {
   isTestMode: boolean;
   signInMethods: SignInMethod[];
   branding: Branding;
+
+  /**
+   * What this environment does about confirming addresses.
+   *
+   * The components need it to render the right screen: an environment
+   * that sends a code and a screen that says "open the link" is a dead
+   * end for whoever is holding the code.
+   */
+  emailVerification?: {
+    /** `at_signup` sends immediately; `later` waits for you; `never` skips it. */
+    policy: 'at_signup' | 'later' | 'never';
+    /** `code`, `link`, or both. Empty means the environment default. */
+    strategies: string[];
+    /** `block` means no session until the address is confirmed. */
+    unverifiedAccess: 'allow' | 'block';
+  };
 }
+
+/**
+ * Branding overridden in code.
+ *
+ * ── Why it is a Partial of Branding and not its own vocabulary ────
+ * Every field here is one a developer has already met in the console.
+ * Inventing a second set of names would mean two things to learn, two
+ * things to document, and a mapping between them that goes stale.
+ *
+ * ── Why `showPoweredBy` is not in it ─────────────────────────────
+ * Whether "Secured by ZevAuth" appears is decided by the server, from
+ * the plan. Letting a prop turn it off would make a paid feature free
+ * to anybody who read the types. The merge drops it even when it is
+ * present at runtime, so a plain JavaScript caller cannot set it
+ * either.
+ */
+export type Appearance = Partial<Omit<Branding, 'showPoweredBy' | 'appName'>>;
 
 /** What every listener receives. `null` user means signed out. */
 export interface ZevAuthState {

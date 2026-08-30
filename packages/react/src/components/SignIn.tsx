@@ -1,6 +1,9 @@
 import { useState, type FormEvent, type ReactNode } from 'react';
-import { ZevAuthError } from '@zevauth/js';
-import { useZevAuthContext } from '../internal/context.js';
+import { ZevAuthError, type Appearance } from '@zevauth/js';
+import {
+  mergeAppearance,
+  useZevAuthContext,
+} from '../internal/context.js';
 import { Brandable } from './Brandable.js';
 import {
   Alert,
@@ -48,6 +51,13 @@ export interface SignInProps {
    * wrote a panel did not write it to be replaced from elsewhere.
    */
   aside?: ReactNode;
+
+  /**
+   * Branding for this component only, over whatever the provider and
+   * the console already decided. Use the provider's `appearance` when
+   * every screen should match; use this when one should not.
+   */
+  appearance?: Appearance;
   /** Rendered instead of the form once somebody is signed in. */
   children?: React.ReactNode;
   className?: string;
@@ -55,6 +65,16 @@ export interface SignInProps {
 
 type Stage =
   | { name: 'credentials' }
+  /**
+   * The password reset, asking for the address itself.
+   *
+   * It used to reuse the sign-in field and refuse when that was empty,
+   * with the only cue being reduced opacity on a ghost button. Nobody
+   * reads that as "type your email above first"; they read it as a
+   * broken link, which is exactly what the first developer to try it
+   * reported.
+   */
+  | { name: 'reset-request' }
   | { name: 'code-sent'; email: string }
   | { name: 'link-sent'; email: string };
 
@@ -78,20 +98,35 @@ export function SignIn({
   secondaryMethods = 'inline',
   layout,
   aside,
+  appearance,
   children,
   className,
 }: SignInProps) {
-  const { client, state } = useZevAuthContext('<SignIn>');
+  const { client, state, branding: contextBranding } = useZevAuthContext('<SignIn>');
 
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [code, setCode] = useState('');
   const [stage, setStage] = useState<Stage>({ name: 'credentials' });
+
+  /*
+   * Its own field, seeded from the sign-in one. Somebody who typed
+   * their address and then realised they had forgotten the password
+   * should not have to type it again.
+   */
+  const [resetEmail, setResetEmail] = useState('');
   const [showMore, setShowMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
 
-  const branding = client.branding;
+  /*
+   * From context, not from the client: the provider has already
+   * merged any `appearance` over the server's values, and a component
+   * reading `client.branding` would quietly ignore it.
+   */
+  const branding = appearance
+    ? mergeAppearance(contextBranding, appearance)
+    : contextBranding;
   const methods = client.signInMethods;
 
   const hasPassword = methods.includes('email_password');
@@ -124,6 +159,8 @@ export function SignIn({
   const resolvedLayout: SignInLayout =
     layout ??
     ((branding?.signInLayout?.replace('_', '-') as SignInLayout) ?? 'centered');
+
+  const resetMode = branding?.passwordResetMode ?? 'dedicated';
 
   const zevIdIsSecondary =
     hasZevId && hasPassword && secondaryMethods === 'collapsed';
@@ -183,13 +220,69 @@ export function SignIn({
     <Brandable branding={branding} className={className}>
       <Shell
         layout={resolvedLayout}
+        align={branding?.contentAlign ?? 'center'}
         aside={aside ?? <BrandedAside branding={branding} />}
       >
-      <div className="zv-card">
+      <div className="zv-card" data-chrome={branding?.cardStyle ?? 'card'}>
         {client.isTestMode ? <TestModeBadge /> : null}
         <Identity branding={branding} />
 
-        {stage.name === 'link-sent' ? (
+        {stage.name === 'reset-request' ? (
+          <>
+            <Heading
+              title="Reset your password"
+              subtitle="We will email you a link to set a new one."
+              fallbackTitle="Reset your password"
+            />
+            {error ? <Alert>{error}</Alert> : null}
+            <form
+              className="zv-fields"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void run(async () => {
+                  await client.passwordReset.start({ email: resetEmail });
+                  setStage({ name: 'link-sent', email: resetEmail });
+                });
+              }}
+            >
+              <div className="zv-field">
+                <label className="zv-label" htmlFor="zv-reset-email">
+                  Email
+                </label>
+                <input
+                  id="zv-reset-email"
+                  className="zv-input"
+                  type="email"
+                  value={resetEmail}
+                  onChange={(e) => setResetEmail(e.target.value)}
+                  disabled={isBusy}
+                  autoComplete="email"
+                  required
+                  autoFocus
+                />
+              </div>
+              <button
+                type="submit"
+                className="zv-button"
+                data-variant="primary"
+                disabled={isBusy}
+              >
+                {isBusy ? <Spinner /> : 'Send reset link'}
+              </button>
+            </form>
+            <button
+              type="button"
+              className="zv-button"
+              data-variant="ghost"
+              onClick={() => {
+                setError(null);
+                setStage({ name: 'credentials' });
+              }}
+            >
+              Back to sign in
+            </button>
+          </>
+        ) : stage.name === 'link-sent' ? (
           <>
             <h1 className="zv-title">Check your email</h1>
             <p className="zv-subtitle">
@@ -454,14 +547,26 @@ export function SignIn({
                   data-variant="ghost"
                   disabled={isBusy}
                   onClick={() => {
-                    if (!identifier.trim()) {
-                      setError('Enter your email address first, then choose this again.');
+                    /*
+                     * `dedicated` is the default because the alternative
+                     * is a link that appears to do nothing. `inline`
+                     * keeps the original behaviour for anybody who
+                     * deliberately wants one fewer screen.
+                     */
+                    if (resetMode === 'inline') {
+                      if (!identifier.trim()) {
+                        setError('Enter your email address first, then choose this again.');
+                        return;
+                      }
+                      void run(async () => {
+                        await client.passwordReset.start({ email: identifier });
+                        setStage({ name: 'link-sent', email: identifier });
+                      });
                       return;
                     }
-                    void run(async () => {
-                      await client.passwordReset.start({ email: identifier });
-                      setStage({ name: 'link-sent', email: identifier });
-                    });
+                    setError(null);
+                    setResetEmail(identifier);
+                    setStage({ name: 'reset-request' });
                   }}
                 >
                   Forgot your password?

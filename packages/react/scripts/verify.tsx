@@ -19,6 +19,10 @@ import { SignInWithZevId } from '../src/components/SignInWithZevId';
 import { readableOn } from '../src/components/Brandable';
 import { OrganizationProfile } from '../src/components/OrganizationProfile';
 import { SignUp } from '../src/components/SignUp';
+import {
+  EmailUnverified,
+  EmailVerified,
+} from '../src/components/control';
 
 let passed = 0;
 let failed = 0;
@@ -346,6 +350,122 @@ console.log('\n\x1b[1m<SignIn> renders what is ENABLED\x1b[0m');
     'an environment with nothing enabled says so, rather than rendering an empty box',
     nothing.includes('No sign-in methods are enabled'),
   );
+}
+
+console.log('\n\x1b[1mSigning up, and confirming an address\x1b[0m');
+
+{
+  const base = { loaded: true, user: null, methods: ['email_password'] } as const;
+
+  const form = render(clientIn({ ...base }), <SignUp />);
+  check('the password is asked for twice by default', form.includes('zv-signup-confirm'), form.slice(0, 200));
+  check('and the second field is labelled', form.includes('Confirm password'));
+
+  const single = render(clientIn({ ...base }), <SignUp requireConfirmPassword={false} />);
+  check('a product that would rather not can turn it off', !single.includes('zv-signup-confirm'));
+
+  /*
+   * The screen used to say "we sent a link" whatever the environment
+   * sends, so anybody on the code strategy waited for mail telling them
+   * to type six digits into a page with nowhere to type them.
+   */
+  const codeEnv = render(
+    clientIn({ ...base, emailVerification: { policy: 'at_signup', strategies: ['code'], unverifiedAccess: 'allow' } }),
+    <SignUp />,
+  );
+  check('an environment that sends codes is known to the component', codeEnv.length > 0);
+}
+
+console.log('\n\x1b[1mUnverified addresses\x1b[0m');
+
+{
+  const unverified = {
+    loaded: true,
+    user: { ...USER, emailVerified: false },
+  } as const;
+  const verified = { loaded: true, user: { ...USER, emailVerified: true } } as const;
+
+  check(
+    'EmailUnverified shows only to somebody who has not confirmed',
+    render(clientIn({ ...unverified }), <EmailUnverified><p>confirm</p></EmailUnverified>).includes('confirm') &&
+      !render(clientIn({ ...verified }), <EmailUnverified><p>confirm</p></EmailUnverified>).includes('confirm'),
+  );
+  check(
+    'EmailVerified is the other half of the pair',
+    render(clientIn({ ...verified }), <EmailVerified><p>payouts</p></EmailVerified>).includes('payouts') &&
+      !render(clientIn({ ...unverified }), <EmailVerified><p>payouts</p></EmailVerified>).includes('payouts'),
+  );
+  check(
+    'and neither flashes the wrong branch before the session loads',
+    !render(clientIn({ loaded: false }), <EmailUnverified><p>confirm</p></EmailUnverified>).includes('confirm'),
+  );
+}
+
+console.log('\n\x1b[1mOverriding the console from code\x1b[0m');
+
+{
+  const base = { loaded: true, user: null, methods: ['email_password'] } as const;
+
+  const overridden = render(
+    clientIn({ ...base, branding: { signInTitle: 'From the console' } }),
+    <SignIn appearance={{ signInTitle: 'From the code' }} />,
+  );
+  check('an appearance override wins over the console', overridden.includes('From the code') && !overridden.includes('From the console'));
+
+  const partial = render(
+    clientIn({ ...base, branding: { signInTitle: 'Kept', signInSubtitle: 'Also kept' } }),
+    <SignIn appearance={{ cardStyle: 'flat' }} />,
+  );
+  check('and anything left out keeps the console value', partial.includes('Kept') && partial.includes('Also kept'));
+
+  /*
+   * The one field code must never win. It is resolved from the plan on
+   * the server, and a prop that switched it off would make a paid
+   * feature free to anybody who read the types.
+   */
+  const stripped = render(
+    clientIn({ ...base, branding: { showPoweredBy: true } }),
+    // Cast, because the type already forbids it. This is the JavaScript
+    // caller who has no types to stop them.
+    <SignIn appearance={{ showPoweredBy: false } as never} />,
+  );
+  check('but the ZevAuth badge cannot be stripped from code', stripped.includes('Secured by'));
+
+  const flat = render(clientIn({ ...base, branding: { cardStyle: 'flat' } }), <SignIn />);
+  check('a flat card drops our chrome so it blends into the page', flat.includes('data-chrome="flat"'));
+  const carded = render(clientIn({ ...base }), <SignIn />);
+  check('and card is still the default', carded.includes('data-chrome="card"'));
+
+  const top = render(
+    clientIn({ ...base, branding: { signInLayout: 'split_right', contentAlign: 'top' } }),
+    <SignIn />,
+  );
+  check('the form can start at the top instead of centring', top.includes('data-align="top"'));
+}
+
+console.log('\n\x1b[1mForgetting a password\x1b[0m');
+
+{
+  const base = { loaded: true, user: null, methods: ['email_password'] } as const;
+
+  const dedicated = render(clientIn({ ...base }), <SignIn />);
+  // Scoped to the button itself: other controls on the page are
+  // legitimately disabled while the email field is empty.
+  const forgotButton = dedicated.slice(
+    dedicated.lastIndexOf('<button', dedicated.indexOf('Forgot your password?')),
+    dedicated.indexOf('Forgot your password?'),
+  );
+  check(
+    'the reset link is offered without needing the email filled first',
+    forgotButton.length > 0 && !forgotButton.includes('disabled'),
+    forgotButton,
+  );
+
+  const inline = render(
+    clientIn({ ...base, branding: { passwordResetMode: 'inline' } }),
+    <SignIn />,
+  );
+  check('the old single-screen behaviour is still available', inline.includes('Forgot your password?'));
 }
 
 console.log('\n\x1b[1mSplit sign-in screens\x1b[0m');

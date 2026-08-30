@@ -44,6 +44,25 @@ export class SignUpFlow {
     };
   }
 
+  /**
+   * Confirms an address with the short code we emailed.
+   *
+   * The API has accepted a code since it shipped; nothing in this SDK
+   * called it, so an environment configured to send codes had no way to
+   * redeem one and `<SignUp>` told people to open a link that was never
+   * sent.
+   *
+   * Returns the session when the environment issues one on
+   * confirmation, and null when it does not, so a caller can tell
+   * "you are in" from "now sign in".
+   */
+  async verifyCode(params: { email: string; code: string }) {
+    return this.http.post<{ session: unknown | null }>('/v1/auth/verify-email', {
+      email: params.email,
+      code: params.code,
+    });
+  }
+
   /** Re-sends the confirmation email. */
   async resendVerification(params: {
     email: string;

@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import type { Branding } from '@zevauth/js';
+import { useZevTheme } from './Brandable.js';
 
 /** The ZEV mark. The same paths every Zev product uses. */
 export function ZevMark({ size = 11 }: { size?: number }) {
@@ -182,10 +183,12 @@ export type SignInLayout = 'centered' | 'split-left' | 'split-right';
  */
 export function Shell({
   layout,
+  align = 'center',
   aside,
   children,
 }: {
   layout: SignInLayout;
+  align?: 'center' | 'top';
   aside: ReactNode;
   children: ReactNode;
 }) {
@@ -194,7 +197,9 @@ export function Shell({
   return (
     <div className="zv-split" data-form={layout === 'split-left' ? 'left' : 'right'}>
       <div className="zv-aside">{aside}</div>
-      <div className="zv-formpane">{children}</div>
+      <div className="zv-formpane" data-align={align}>
+        {children}
+      </div>
     </div>
   );
 }
@@ -206,9 +211,30 @@ export function Shell({
  * accent rather than rendering an empty box with a stray gradient.
  */
 export function BrandedAside({ branding }: { branding: Branding | null }) {
+  /*
+   * Hooks before the early return: React requires the same number of
+   * them on every render, and `branding` is null on the first one.
+   */
+  const isDark = useZevTheme();
+
   if (!branding) return null;
-  const { asideStyle, asideColor, asideImageUrl, asideHeading, asideText } =
-    branding;
+  const { asideStyle, asideHeading, asideText } = branding;
+
+  /*
+   * The dark variants, where a developer set them.
+   *
+   * A panel is half the screen. A colour picked to sit behind white
+   * text on a light page is usually wrong on a dark one, and a
+   * photograph shot for one is often unreadable on the other. The API
+   * already falls back to the light value when no dark one is set, so
+   * anybody who does not care never meets this.
+   */
+  const asideColor = isDark
+    ? branding.asideColorDark ?? branding.asideColor
+    : branding.asideColor;
+  const asideImageUrl = isDark
+    ? branding.asideImageUrlDark ?? branding.asideImageUrl
+    : branding.asideImageUrl;
 
   const usesImage = asideStyle === 'image' && Boolean(asideImageUrl);
 

@@ -81,3 +81,43 @@ export function Protect({
 
   return <>{children}</>;
 }
+
+/**
+ * Renders only when the signed-in person has confirmed their address.
+ *
+ * ── Why this pairs with `<EmailUnverified>` and not with a boolean ──
+ * The relaxed policy lets somebody in before they confirm, and leaves
+ * the developer to decide what that restricts. In practice that is two
+ * questions with two different answers on the same page: what to hide
+ * from them, and what to tell them about it. Two components read better
+ * at the call site than one flag tested twice.
+ *
+ * Both render nothing until the session has loaded, so neither flashes
+ * the wrong branch on first paint.
+ *
+ * ```tsx
+ * <EmailUnverified>
+ *   <Banner>Confirm your email to enable payouts.</Banner>
+ * </EmailUnverified>
+ * <EmailVerified>
+ *   <PayoutSettings />
+ * </EmailVerified>
+ * ```
+ *
+ * This is a UI decision, not a security boundary. Your API must check
+ * the `email_verified` claim itself: hiding a button does not stop a
+ * request.
+ */
+export function EmailVerified({ children }: { children: ReactNode }) {
+  const { state } = useZevAuthContext('<EmailVerified>');
+  if (!state.isLoaded || !state.user?.emailVerified) return null;
+  return <>{children}</>;
+}
+
+/** Renders only when the signed-in person has NOT confirmed their address. */
+export function EmailUnverified({ children }: { children: ReactNode }) {
+  const { state } = useZevAuthContext('<EmailUnverified>');
+  if (!state.isLoaded || !state.user) return null;
+  if (state.user.emailVerified) return null;
+  return <>{children}</>;
+}

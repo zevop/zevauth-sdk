@@ -1,12 +1,29 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { createZevAuth, type ZevAuth, type ZevAuthState } from '@zevauth/js';
-import { ZevAuthContext } from './internal/context.js';
+import {
+  createZevAuth,
+  type Appearance,
+  type ZevAuth,
+  type ZevAuthState,
+} from '@zevauth/js';
+import { ZevAuthContext, mergeAppearance } from './internal/context.js';
 
 export interface ZevAuthProviderProps {
   publishableKey?: string;
   /** An already-constructed client. Useful for tests and for SSR setups. */
   client?: ZevAuth;
   apiUrl?: string;
+
+  /**
+   * Branding overridden in code, applied to every ZevAuth component
+   * under this provider.
+   *
+   * Anything you leave out keeps whatever the console is set to, so a
+   * team can move one value into their repository without moving all of
+   * them. `showPoweredBy` is not overridable: it is resolved from the
+   * plan on the server.
+   */
+  appearance?: Appearance;
+
   children: ReactNode;
 }
 
@@ -30,6 +47,7 @@ export function ZevAuthProvider({
   publishableKey,
   client: provided,
   apiUrl,
+  appearance,
   children,
 }: ZevAuthProviderProps) {
   const clientRef = useRef<ZevAuth | null>(provided ?? null);
@@ -73,7 +91,22 @@ export function ZevAuthProvider({
     return unsubscribe;
   }, [client]);
 
-  const value = useMemo(() => ({ client, state }), [client, state]);
+  /*
+   * Recomputed when the client reports new branding or the prop
+   * changes. `state` is in the dependency list because `client.branding`
+   * arrives with the environment load, and that load is what moves
+   * `isLoaded` — without it the first render's null branding would
+   * stick.
+   */
+  const branding = useMemo(
+    () => mergeAppearance(client.branding, appearance),
+    [client, state, appearance],
+  );
+
+  const value = useMemo(
+    () => ({ client, state, branding }),
+    [client, state, branding],
+  );
 
   return (
     <ZevAuthContext.Provider value={value}>{children}</ZevAuthContext.Provider>

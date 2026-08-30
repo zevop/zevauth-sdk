@@ -56,6 +56,8 @@ export {
 } from './components/OrganizationSwitcher.js';
 
 export {
+  EmailUnverified,
+  EmailVerified,
   SignedIn,
   SignedOut,
   ZevAuthLoading,
@@ -78,3 +80,4 @@ export type {
   ZevAuthUser,
 } from '@zevauth/js';
 export { ZevAuthError } from '@zevauth/js';
+export { useZevTheme } from './components/Brandable.js';

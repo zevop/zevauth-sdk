@@ -138,6 +138,16 @@ export class ZevAuth {
     return this.tokens.getOrganization();
   }
 
+  /**
+   * What this environment does about confirming addresses.
+   *
+   * Exposed so the components can render the right verification screen
+   * rather than assuming a link.
+   */
+  get emailVerification(): EnvironmentConfig['emailVerification'] {
+    return this.environment?.emailVerification;
+  }
+
   get signInMethods(): SignInMethod[] {
     return this.environment?.signInMethods ?? [];
   }

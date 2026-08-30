@@ -149,6 +149,32 @@ const AUTHORED = `
 .zv-card[data-size='wide'] { width: 460px; }
 
 /*
+ * Blended into the page rather than drawn as a card.
+ *
+ * A developer who has already designed the panel this sits in gets a
+ * box inside a box otherwise — the same duplication the identity block
+ * had, and the same fix: let them turn our chrome off.
+ *
+ * The width stays. It is what keeps the fields a readable measure, and
+ * dropping it here would make a flat form stretch to whatever container
+ * it landed in.
+ */
+.zv-card[data-chrome='flat'] {
+  background: transparent;
+  border-color: transparent;
+  padding: 0;
+}
+
+/*
+ * Vertical placement inside a pane.
+ *
+ * Centering is right on a full-height sign-in page and wrong inside an
+ * app shell, where a fixed header and a centered form end up on top of
+ * each other.
+ */
+.zv-formpane[data-align='top'] { align-items: flex-start; }
+
+/*
  * The split screen: form on one side, a picture on the other.
  *
  * \`data-form\` names where the FORM goes, because that is the thing a

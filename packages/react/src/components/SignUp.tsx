@@ -1,6 +1,9 @@
 import { useState, type FormEvent, type ReactNode } from 'react';
-import { ZevAuthError } from '@zevauth/js';
-import { useZevAuthContext } from '../internal/context.js';
+import { ZevAuthError, type Appearance } from '@zevauth/js';
+import {
+  mergeAppearance,
+  useZevAuthContext,
+} from '../internal/context.js';
 import { Brandable } from './Brandable.js';
 import {
   Alert,
@@ -18,6 +21,13 @@ import {
 
 export interface SignUpProps {
   afterSignUpUrl?: string;
+  /**
+   * Ask for the password twice. On by default: a typo in a new password
+   * is invisible until it locks somebody out of the account they just
+   * made.
+   */
+  requireConfirmPassword?: boolean;
+
   /** Rendered once the account exists and a session started. */
   children?: ReactNode;
   className?: string;
@@ -27,6 +37,13 @@ export interface SignUpProps {
 
   /** What fills the other half of a split screen. Overrides the console. */
   aside?: ReactNode;
+
+  /**
+   * Branding for this component only, over whatever the provider and
+   * the console already decided. Use the provider's `appearance` when
+   * every screen should match; use this when one should not.
+   */
+  appearance?: Appearance;
 }
 
 /**
@@ -45,17 +62,28 @@ export function SignUp({
   className,
   layout,
   aside,
+  appearance,
+  requireConfirmPassword = true,
 }: SignUpProps) {
-  const { client, state } = useZevAuthContext('<SignUp>');
+  const { client, state, branding: contextBranding } = useZevAuthContext('<SignUp>');
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [code, setCode] = useState('');
   const [firstName, setFirstName] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
   const [awaitingVerification, setAwaitingVerification] = useState(false);
 
-  const branding = client.branding;
+  /*
+   * From context, not from the client: the provider has already
+   * merged any `appearance` over the server's values, and a component
+   * reading `client.branding` would quietly ignore it.
+   */
+  const branding = appearance
+    ? mergeAppearance(contextBranding, appearance)
+    : contextBranding;
 
   /*
    * The same layout as sign-in, from the same setting. A product whose
@@ -66,6 +94,22 @@ export function SignUp({
   const resolvedLayout: SignInLayout =
     layout ??
     ((branding?.signInLayout?.replace('_', '-') as SignInLayout) ?? 'centered');
+  /*
+   * Shown once the second field has something in it, so the error
+   * appears when a mistake exists rather than while one is being typed.
+   */
+  const mismatch =
+    requireConfirmPassword &&
+    confirmPassword.length > 0 &&
+    confirmPassword !== password;
+
+  /*
+   * What this environment actually sends. An empty list means the
+   * environment default, which is a link.
+   */
+  const wantsCode =
+    client.emailVerification?.strategies?.includes('code') ?? false;
+
   const hasPassword = client.signInMethods.includes('email_password');
   const hasZevId = client.signInMethods.includes('zevid');
 
@@ -108,9 +152,10 @@ export function SignUp({
     <Brandable branding={branding} className={className}>
       <Shell
         layout={resolvedLayout}
+        align={branding?.contentAlign ?? 'center'}
         aside={aside ?? <BrandedAside branding={branding} />}
       >
-      <div className="zv-card">
+      <div className="zv-card" data-chrome={branding?.cardStyle ?? 'card'}>
         {client.isTestMode ? <TestModeBadge /> : null}
         <Identity branding={branding} />
 
@@ -118,9 +163,68 @@ export function SignUp({
           <>
             <h1 className="zv-title">Confirm your email</h1>
             <p className="zv-subtitle">
-              We sent a link to {email}. Open it to finish setting up your
-              account.
+              {wantsCode
+                ? `We sent a code to ${email}. Enter it below to finish setting up your account.`
+                : `We sent a link to ${email}. Open it to finish setting up your account.`}
             </p>
+            {error ? <Alert>{error}</Alert> : null}
+
+            {/*
+              A field, when the environment sends a code.
+              
+              This screen used to say "we sent a link" whatever the
+              environment was configured to send, so anybody on the code
+              strategy waited for mail that told them to type six digits
+              into a screen with nowhere to type them.
+            */}
+            {wantsCode ? (
+              <form
+                className="zv-fields"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  setError(null);
+                  setIsBusy(true);
+                  client.signUp
+                    .verifyCode({ email, code })
+                    .catch((err: unknown) =>
+                      setError(
+                        err instanceof ZevAuthError
+                          ? err.message
+                          : 'That code was not accepted.',
+                      ),
+                    )
+                    .finally(() => setIsBusy(false));
+                }}
+              >
+                <div className="zv-field">
+                  <label className="zv-label" htmlFor="zv-verify-code">
+                    Verification code
+                  </label>
+                  <input
+                    id="zv-verify-code"
+                    className="zv-input"
+                    value={code}
+                    onChange={(e) => setCode(e.target.value)}
+                    disabled={isBusy}
+                    /* So a phone offers the numeric keypad and the OS
+                       can fill it straight from the message. */
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    required
+                    autoFocus
+                  />
+                </div>
+                <button
+                  type="submit"
+                  className="zv-button"
+                  data-variant="primary"
+                  disabled={isBusy || code.length === 0}
+                >
+                  {isBusy ? <Spinner /> : null}
+                  Confirm
+                </button>
+              </form>
+            ) : null}
           </>
         ) : (
           <>
@@ -206,11 +310,51 @@ export function SignUp({
                   <span className="zv-hint">8 characters or more.</span>
                 </div>
 
+                {/*
+                  A second field, because a typo in the first one is
+                  invisible and only surfaces later as a password reset.
+                  Off by default is the wrong default here: the cost is
+                  one field, and the cost of getting it wrong is a
+                  person locked out of an account they just created.
+
+                  `requireConfirmPassword={false}` turns it off for
+                  products that would rather trust the reveal button.
+                */}
+                {requireConfirmPassword ? (
+                  <div className="zv-field">
+                    <label className="zv-label" htmlFor="zv-signup-confirm">
+                      Confirm password
+                    </label>
+                    <input
+                      id="zv-signup-confirm"
+                      className="zv-input"
+                      type="password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      disabled={isBusy}
+                      autoComplete="new-password"
+                      required
+                      aria-invalid={mismatch ? true : undefined}
+                    />
+                    {/* Only once they have typed enough to have made a
+                        mistake. Saying "does not match" against an empty
+                        box is telling somebody off for not finishing. */}
+                    {mismatch ? (
+                      <span className="zv-fielderror">
+                        These passwords do not match.
+                      </span>
+                    ) : null}
+                  </div>
+                ) : null}
+
                 <button
                   type="submit"
                   className="zv-button"
                   data-variant="primary"
-                  disabled={isBusy || !email || password.length < 8}
+                  disabled={
+                    isBusy || !email || password.length < 8 || mismatch ||
+                    (requireConfirmPassword && confirmPassword.length === 0)
+                  }
                 >
                   {isBusy ? <Spinner /> : null}
                   Create account

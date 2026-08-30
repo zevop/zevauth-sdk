@@ -1,4 +1,11 @@
-import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from 'react';
 import type { Branding } from '@zevauth/js';
 import { ensureStyles } from '../internal/styles.js';
 
@@ -90,6 +97,7 @@ export function Brandable({
   };
 
   return (
+    <ZevThemeContext.Provider value={isDark}>
     <div
       className={className ? `zv-root ${className}` : 'zv-root'}
       data-theme={isDark ? 'dark' : 'light'}
@@ -97,6 +105,7 @@ export function Brandable({
     >
       {children}
     </div>
+    </ZevThemeContext.Provider>
   );
 }
 
@@ -125,4 +134,23 @@ export function readableOn(hex: string): string {
   // 0.45 rather than 0.5: the eye forgives light-on-dark more readily
   // than dark-on-light, so the switch happens slightly later.
   return luminance > 0.45 ? '#171717' : '#ffffff';
+}
+
+/**
+ * Whether the surface is currently painting dark.
+ *
+ * `Brandable` already resolves this: the console can force a scheme or
+ * follow the device, and re-deriving it anywhere else is a second
+ * answer waiting to disagree. Exported so the panel beside a split form
+ * can pick its dark variant, and so a developer writing their own
+ * `aside` can match without wiring up their own media query.
+ *
+ * ```tsx
+ * <SignIn aside={<MyPanel dark={useZevTheme()} />} />
+ * ```
+ */
+export const ZevThemeContext = createContext(false);
+
+export function useZevTheme(): boolean {
+  return useContext(ZevThemeContext);
 }
