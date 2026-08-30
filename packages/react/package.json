@@ -1,6 +1,6 @@
 {
   "name": "@zevauth/react",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "ZevAuth for React: hooks and drop-in authentication components.",
   "keywords": [
     "zevauth",
