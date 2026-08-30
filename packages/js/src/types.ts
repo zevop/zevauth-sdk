@@ -166,6 +166,21 @@ export interface EnvironmentConfig {
  */
 export type Appearance = Partial<Omit<Branding, 'showPoweredBy' | 'appName'>>;
 
+/**
+ * Why a sign-in that left the page came back without a session.
+ *
+ *   zevid_expired   the person took longer than the flow allows
+ *   zevid_denied    they chose not to continue on the consent screen
+ *   zevid_rejected  ZevID answered, but with something we could not accept
+ *   zevid_error     ZevID could not complete the sign-in
+ *
+ * `description` is written for the person and safe to show as-is.
+ */
+export interface HandoffError {
+  code: 'zevid_expired' | 'zevid_denied' | 'zevid_rejected' | 'zevid_error' | (string & {});
+  description: string;
+}
+
 /** What every listener receives. `null` user means signed out. */
 export interface ZevAuthState {
   isLoaded: boolean;

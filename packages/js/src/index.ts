@@ -36,4 +36,4 @@ import { ZevAuth, type ZevAuthOptions } from './client.js';
 export function createZevAuth(options: ZevAuthOptions): ZevAuth {
   return new ZevAuth(options);
 }
-export type { Appearance } from './types.js';
+export type { Appearance, HandoffError } from './types.js';

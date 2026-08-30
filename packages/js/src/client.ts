@@ -1,3 +1,4 @@
+import type { HandoffError } from './types.js';
 import { Http } from './internal/http.js';
 import { RefreshCoordinator } from './internal/refresh-coordinator.js';
 import {
@@ -128,6 +129,22 @@ export class ZevAuth {
 
   get isLoaded(): boolean {
     return this.loaded;
+  }
+
+  private pendingHandoffError: HandoffError | null = null;
+
+  /**
+   * The error a sign-in came back with, once.
+   *
+   * Returns it and clears it, so the component that shows it is the
+   * only one that does. `<SignIn>` calls this on mount; call it yourself
+   * if you render your own sign-in and want to tell the person why the
+   * ZevID button brought them straight back.
+   */
+  takeHandoffError(): HandoffError | null {
+    const error = this.pendingHandoffError;
+    this.pendingHandoffError = null;
+    return error;
   }
 
   get user(): ZevAuthUser | null {
@@ -335,7 +352,29 @@ export class ZevAuth {
 
     const url = new URL(location.href);
     const code = url.searchParams.get('code');
-    if (!code) return;
+
+    /*
+     * A failed brokered sign-in comes back the same way a successful
+     * one does — to this page — but with `error` instead of `code`.
+     * Kept for whoever asks (the <SignIn> component does, on mount),
+     * and scrubbed from the URL so a reload does not show it twice.
+     */
+    if (!code) {
+      const error = url.searchParams.get('error');
+      if (error) {
+        this.pendingHandoffError = {
+          code: error,
+          description:
+            url.searchParams.get('error_description') ??
+            'The sign-in could not be completed.',
+        };
+        for (const key of ['error', 'error_description', 'state']) {
+          url.searchParams.delete(key);
+        }
+        globalThis.history?.replaceState({}, '', url.toString());
+      }
+      return;
+    }
 
     try {
       const response = await this.http.post<SessionResponse>(

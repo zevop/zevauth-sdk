@@ -2,11 +2,14 @@
   "name": "zevauth-sdk",
   "private": true,
   "type": "module",
-  "workspaces": ["packages/*"],
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "verify": "npm run verify --workspaces --if-present"
+    "verify": "npm run verify --workspaces --if-present",
+    "release": "bash scripts/release.sh"
   },
   "devDependencies": {
     "tsx": "^4.20.6",

@@ -493,6 +493,21 @@ async function main() {
     }
   }
 
+  console.log('\n\x1b[1mA sign-in that came back with an error\x1b[0m');
+  {
+    let href = 'https://app.example.com/callback?error=zevid_expired&error_description=Took%20too%20long&state=abc&keep=1';
+    (globalThis as any).location = { get href() { return href; }, assign() {} };
+    (globalThis as any).history = { replaceState: (_s: unknown, _t: string, url: string) => { href = url; } };
+    const { client } = makeClient(fakeApi());
+    await client.load();
+    const err = client.takeHandoffError();
+    check('the error is handed to whoever asks', err?.code === 'zevid_expired' && err.description === 'Took too long', JSON.stringify(err));
+    check('once', client.takeHandoffError() === null);
+    check('and scrubbed from the URL, leaving the rest alone', !href.includes('error') && !href.includes('state=') && href.includes('keep=1'), href);
+    check('nobody is signed in', client.user === null);
+    delete (globalThis as any).location; delete (globalThis as any).history;
+  }
+
   console.log('\n\x1b[1mHosted handoff\x1b[0m');
 
   {

@@ -116,7 +116,14 @@ export function SignIn({
    */
   const [resetEmail, setResetEmail] = useState('');
   const [showMore, setShowMore] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  /*
+   * Seeded from the client, once: a brokered sign-in that failed comes
+   * back to this page with a reason, and the person should read it
+   * here, in the box they started from, not in a console log.
+   */
+  const [error, setError] = useState<string | null>(
+    () => client.takeHandoffError()?.description ?? null,
+  );
   const [isBusy, setIsBusy] = useState(false);
 
   /*
