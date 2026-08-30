@@ -28,6 +28,15 @@ export interface StoredSession {
   refreshToken: string;
   /** Epoch ms. When the ACCESS token expires, not the refresh token. */
   expiresAt: number;
+  /**
+   * Who the session belongs to, so a fresh page load can render the
+   * signed-in state without depending on the refresh response carrying
+   * a user. A profile in localStorage is less sensitive than the
+   * refresh token beside it, and it is the difference between "welcome
+   * back" and a sign-in form for someone who never signed out.
+   */
+  user?: ZevAuthUser;
+  organization?: ActiveOrganization | null;
 }
 
 export interface SessionStorageAdapter {
@@ -110,12 +119,34 @@ export class TokenStore {
     this.accessToken = params.accessToken;
     this.user = params.user;
     this.organization = params.organization;
+    this.persist(params);
+  }
+
+  /**
+   * Rehydrates memory from a persisted session, before any network.
+   * A page load knows who was signed in the moment storage is read.
+   */
+  hydrate(stored: StoredSession): void {
+    if (stored.user) this.user = stored.user;
+    if (stored.organization !== undefined) this.organization = stored.organization;
+  }
+
+  private persist(params: {
+    refreshToken: string;
+    expiresIn: number;
+    user: ZevAuthUser;
+    organization: ActiveOrganization | null;
+  }): void {
+    this.user = params.user;
+    this.organization = params.organization;
 
     this.storage.set(
       this.key,
       JSON.stringify({
         refreshToken: params.refreshToken,
         expiresAt: Date.now() + params.expiresIn * 1000,
+        user: params.user,
+        organization: params.organization,
       } satisfies StoredSession),
     );
   }

@@ -279,11 +279,21 @@ export class ZevAuth {
 
   /** Adopts a session response and tells everyone about it. */
   private adopt(response: SessionResponse): void {
+    /*
+     * A response without a user must never erase the one we have.
+     *
+     * Sign-in returns a user; for a while, refresh did not — and this
+     * line adopted both, so every fresh page load refreshed the session
+     * successfully and then set `user` to undefined. The stored session
+     * sat in localStorage, valid and rotated, next to a sign-in form.
+     * The refresh only proves the session is alive; it does not change
+     * whose it is.
+     */
     this.tokens.write({
       accessToken: response.session.accessToken,
       refreshToken: response.session.refreshToken,
       expiresIn: response.session.expiresIn,
-      user: response.user,
+      user: response.user ?? this.tokens.getUser() ?? response.user,
       organization: response.session.organization ?? null,
     });
     this.emit();
@@ -316,6 +326,10 @@ export class ZevAuth {
   private async restore(): Promise<void> {
     const stored = this.tokens.readPersisted();
     if (!stored) return;
+
+    // Who was signed in is known before any network happens, so the
+    // refresh below only has to prove the session is still alive.
+    this.tokens.hydrate(stored);
 
     try {
       await this.coordinator.refresh();

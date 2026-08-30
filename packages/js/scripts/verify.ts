@@ -63,6 +63,13 @@ interface Call {
 function fakeApi(options: {
   onRefresh?: (n: number, body: any) => 'ok' | 'reuse';
   refreshDelayMs?: number;
+  /**
+   * Respond to refresh the way the real backend did for months: the
+   * session alone, no user. The suite's fake always included the user,
+   * which is exactly why the forgotten-user bug lived in production
+   * while every test here passed.
+   */
+  refreshOmitsUser?: boolean;
 } = {}) {
   const calls: Call[] = [];
   let refreshCount = 0;
@@ -105,7 +112,7 @@ function fakeApi(options: {
 
       issued++;
       return json(200, {
-        user: USER,
+        ...(options.refreshOmitsUser ? {} : { user: USER }),
         session: {
           accessToken: `at_${issued}`,
           refreshToken: `rt_${issued}`,
@@ -417,6 +424,36 @@ async function main() {
       'signed out, the org list is empty rather than an error',
       (await client.organizations.list()).length === 0,
     );
+  }
+
+  console.log('\n\x1b[1mA fresh page load remembers who was signed in\x1b[0m');
+  {
+    /*
+     * Two clients sharing one storage adapter: the first signs in and
+     * persists; the second is "the reopened tab", against a backend
+     * whose refresh returns the session alone. The user must come from
+     * what was persisted, not from hoping the network repeats it.
+     */
+    const storage = memoryStorage();
+    const first = new ZevAuth({
+      publishableKey: 'pk_test_abc', apiUrl: 'https://api.test',
+      fetch: fakeApi().fetch, storage,
+    });
+    await first.load();
+    await first.signIn.withPassword({ identifier: 'ada@example.com', password: 'pw' });
+    check('the first tab is signed in', first.user?.id === USER.id);
+
+    const reopened = new ZevAuth({
+      publishableKey: 'pk_test_abc', apiUrl: 'https://api.test',
+      fetch: fakeApi({ refreshOmitsUser: true }).fetch, storage,
+    });
+    await reopened.load();
+    check(
+      'the reopened tab is signed in even though refresh returned no user',
+      reopened.user?.id === USER.id,
+      JSON.stringify(reopened.user),
+    );
+    check('and holds the rotated session', reopened.isLoaded);
   }
 
   console.log('\n\x1b[1mThe ZevID redirect\x1b[0m');
