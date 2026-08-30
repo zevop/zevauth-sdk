@@ -207,20 +207,40 @@ export function Shell({
  */
 export function BrandedAside({ branding }: { branding: Branding | null }) {
   if (!branding) return null;
-  const { asideImageUrl, asideHeading, asideText } = branding;
-  if (!asideImageUrl && !asideHeading && !asideText) return null;
+  const { asideStyle, asideColor, asideImageUrl, asideHeading, asideText } =
+    branding;
+
+  const usesImage = asideStyle === 'image' && Boolean(asideImageUrl);
+
+  /*
+   * The colour is applied here rather than in the stylesheet because it
+   * is per-tenant. `solid` is the flat colour; `gradient` sweeps it into
+   * a darker corner, which is what makes a quote readable on it without
+   * needing a scrim.
+   *
+   * `color-mix` rather than shipping a colour-maths helper: the browser
+   * already knows how to darken a colour, in whatever space the value
+   * was written in, including ones a hex parser would not accept.
+   */
+  const background = usesImage
+    ? undefined
+    : asideStyle === 'solid'
+      ? asideColor ?? undefined
+      : asideColor
+        ? `linear-gradient(140deg, ${asideColor}, color-mix(in oklab, ${asideColor} 62%, black))`
+        : undefined;
 
   return (
-    <>
-      {asideImageUrl ? (
+    <div className="zv-aside-fill" style={background ? { background } : undefined}>
+      {usesImage && asideImageUrl ? (
         <img className="zv-aside-image" src={asideImageUrl} alt="" />
       ) : null}
       {asideHeading || asideText ? (
-        <div className="zv-aside-body">
+        <div className="zv-aside-body" data-scrim={usesImage ? 'true' : 'false'}>
           {asideHeading ? <p className="zv-aside-heading">{asideHeading}</p> : null}
           {asideText ? <p className="zv-aside-text">{asideText}</p> : null}
         </div>
       ) : null}
-    </>
+    </div>
   );
 }

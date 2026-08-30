@@ -4,13 +4,16 @@ import { useZevAuthContext } from '../internal/context.js';
 import { Brandable } from './Brandable.js';
 import {
   Alert,
+  BrandedAside,
   Divider,
   Heading,
   Identity,
+  Shell,
   PoweredBy,
   Spinner,
   TestModeBadge,
   ZevMark,
+  type SignInLayout,
 } from './parts.js';
 
 export interface SignUpProps {
@@ -18,6 +21,12 @@ export interface SignUpProps {
   /** Rendered once the account exists and a session started. */
   children?: ReactNode;
   className?: string;
+
+  /** Where the form sits. Defaults to the console's setting, as sign-in does. */
+  layout?: SignInLayout;
+
+  /** What fills the other half of a split screen. Overrides the console. */
+  aside?: ReactNode;
 }
 
 /**
@@ -30,7 +39,13 @@ export interface SignUpProps {
  * session means straight in, and no session means the confirmation
  * screen. Forcing either would override a deliberate configuration.
  */
-export function SignUp({ afterSignUpUrl, children, className }: SignUpProps) {
+export function SignUp({
+  afterSignUpUrl,
+  children,
+  className,
+  layout,
+  aside,
+}: SignUpProps) {
   const { client, state } = useZevAuthContext('<SignUp>');
 
   const [email, setEmail] = useState('');
@@ -41,6 +56,16 @@ export function SignUp({ afterSignUpUrl, children, className }: SignUpProps) {
   const [awaitingVerification, setAwaitingVerification] = useState(false);
 
   const branding = client.branding;
+
+  /*
+   * The same layout as sign-in, from the same setting. A product whose
+   * sign-in is a split screen and whose sign-up is a centered card
+   * looks like two different products at the moment somebody is
+   * deciding whether to trust it.
+   */
+  const resolvedLayout: SignInLayout =
+    layout ??
+    ((branding?.signInLayout?.replace('_', '-') as SignInLayout) ?? 'centered');
   const hasPassword = client.signInMethods.includes('email_password');
   const hasZevId = client.signInMethods.includes('zevid');
 
@@ -81,6 +106,10 @@ export function SignUp({ afterSignUpUrl, children, className }: SignUpProps) {
 
   return (
     <Brandable branding={branding} className={className}>
+      <Shell
+        layout={resolvedLayout}
+        aside={aside ?? <BrandedAside branding={branding} />}
+      >
       <div className="zv-card">
         {client.isTestMode ? <TestModeBadge /> : null}
         <Identity branding={branding} />
@@ -202,6 +231,7 @@ export function SignUp({ afterSignUpUrl, children, className }: SignUpProps) {
           <PoweredBy environmentId={client.environmentId} />
         ) : null}
       </div>
+      </Shell>
     </Brandable>
   );
 }

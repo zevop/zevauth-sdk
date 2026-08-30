@@ -98,6 +98,9 @@ export interface Branding {
    * it. Set in the console; `<SignIn layout=… aside=… />` overrides it.
    */
   signInLayout?: 'centered' | 'split_left' | 'split_right';
+  asideStyle?: 'gradient' | 'solid' | 'image';
+  /** The panel colour. Already falls back to the accent server-side. */
+  asideColor?: string | null;
   asideImageUrl?: string | null;
   asideHeading?: string | null;
   asideText?: string | null;

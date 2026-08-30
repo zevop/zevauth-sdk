@@ -192,12 +192,26 @@ const AUTHORED = `
 }
 /* A scrim, so the copy stays readable over any photograph rather than
    only over the ones that happen to be dark at the bottom. */
-.zv-aside-body::before {
+/*
+ * Only over a photograph. A gradient panel is already dark where the
+ * text sits, and stacking a second scrim on it turns the corner to mud.
+ */
+.zv-aside-body[data-scrim='true']::before {
   content: '';
   position: absolute;
   inset: 0;
   background: linear-gradient(to top, rgba(0,0,0,.62), rgba(0,0,0,0) 55%);
   pointer-events: none;
+}
+/* The panel's own paint, so BrandedAside can set a per-tenant colour
+   without the stylesheet knowing anything about it. */
+.zv-aside-fill {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 44px 40px;
 }
 .zv-aside-body { position: relative; }
 .zv-root.zv-root .zv-aside-heading {

@@ -381,6 +381,7 @@ console.log('\n\x1b[1mSplit sign-in screens\x1b[0m');
       ...base,
       branding: {
         signInLayout: 'split_right',
+        asideStyle: 'image',
         asideImageUrl: 'https://cdn.example/a.png',
         asideHeading: 'Built for teams',
         asideText: 'One balance, every tool.',
@@ -389,6 +390,68 @@ console.log('\n\x1b[1mSplit sign-in screens\x1b[0m');
     <SignIn />,
   );
   check('the console picture and copy fill the panel', branded.includes('Built for teams') && branded.includes('One balance, every tool.'));
+
+  // Sign-up wears the same layout. Two different shapes across sign-in
+  // and sign-up read as two different products.
+  const signUpSplit = render(
+    clientIn({ ...base, branding: { signInLayout: 'split_left' } }),
+    <SignUp />,
+  );
+  check('sign-up takes the same layout', signUpSplit.includes('data-form="left"'), signUpSplit.slice(0, 160));
+
+  // The reset and code screens are stages of <SignIn>, inside the same
+  // shell, so they inherit the split rather than dropping to a card.
+  check(
+    'the split wraps the whole component, not just the first screen',
+    right.indexOf('zv-split') < right.indexOf('zv-card'),
+  );
+
+  const solid = render(
+    clientIn({
+      ...base,
+      branding: { signInLayout: 'split_right', asideStyle: 'solid', asideColor: '#5b3df5' },
+    }),
+    <SignIn />,
+  );
+  check('a solid panel paints the flat colour', solid.includes('#5b3df5') && !solid.includes('linear-gradient'), solid.slice(0, 200));
+
+  const gradient = render(
+    clientIn({
+      ...base,
+      branding: { signInLayout: 'split_right', asideStyle: 'gradient', asideColor: '#5b3df5' },
+    }),
+    <SignIn />,
+  );
+  check('a gradient panel sweeps it', gradient.includes('linear-gradient'));
+
+  const quote = render(
+    clientIn({
+      ...base,
+      branding: {
+        signInLayout: 'split_right',
+        asideStyle: 'gradient',
+        asideColor: '#5b3df5',
+        asideText: 'One balance, every tool.',
+      },
+    }),
+    <SignIn />,
+  );
+  check('a quote sits on the colour with no scrim over it', quote.includes('data-scrim="false"'));
+
+  const banner = render(
+    clientIn({
+      ...base,
+      branding: {
+        signInLayout: 'split_right',
+        asideStyle: 'image',
+        asideImageUrl: 'https://cdn.example/a.png',
+        asideText: 'On a photograph.',
+      },
+    }),
+    <SignIn />,
+  );
+  check('an image panel renders the banner', banner.includes('zv-aside-image'));
+  check('and scrims the text so it stays readable', banner.includes('data-scrim="true"'));
 
   const custom = render(
     clientIn({ ...base, branding: { signInLayout: 'split_right', asideHeading: 'From the console' } }),
