@@ -188,6 +188,19 @@ const AUTHORED = `
  */
 .zv-split {
   display: grid;
+  /*
+   * \`min-width: 0\`, here and on the pane, is what lets the card's
+   * \`max-width: 100%\` mean anything on a phone.
+   *
+   * A grid item's minimum width defaults to \`auto\`, which is "never
+   * narrower than my content". The card's stated 380px IS that content,
+   * so on a 360px screen the pane settled at 380px plus padding, the
+   * card's max-width resolved against a parent already wider than the
+   * viewport, and the page scrolled sideways with the submit button cut
+   * off. The single-column media query below changes the columns, not
+   * the minimum, so it did not help. Reported from a 360px Android.
+   */
+  min-width: 0;
   grid-template-columns: 1fr 1fr;
   min-height: 100dvh;
   width: 100%;
@@ -195,6 +208,7 @@ const AUTHORED = `
 .zv-split[data-form='left'] .zv-aside { order: 2; }
 .zv-formpane {
   display: flex;
+  min-width: 0;
   align-items: center;
   justify-content: center;
   padding: 32px 20px;

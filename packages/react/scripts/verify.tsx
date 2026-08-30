@@ -19,6 +19,7 @@ import { SignInWithZevId } from '../src/components/SignInWithZevId';
 import { readableOn } from '../src/components/Brandable';
 import { OrganizationProfile } from '../src/components/OrganizationProfile';
 import { SignUp } from '../src/components/SignUp';
+import { componentStyles } from '../src/internal/styles';
 import {
   EmailUnverified,
   EmailVerified,
@@ -466,6 +467,24 @@ console.log('\n\x1b[1mForgetting a password\x1b[0m');
     <SignIn />,
   );
   check('the old single-screen behaviour is still available', inline.includes('Forgot your password?'));
+}
+
+console.log('\n\x1b[1mThe stylesheet on a narrow phone\x1b[0m');
+{
+  /*
+   * A grid item's default minimum width is its content, and the card's
+   * stated width is content, so without this the split overflowed a
+   * 360px screen and cut off the submit button. Pinned as a string check
+   * because there is no layout engine here; the rule's presence is the
+   * property.
+   */
+  const rule = (selector: string) => {
+    const i = componentStyles.indexOf(`${selector} {`);
+    return i === -1 ? '' : componentStyles.slice(i, componentStyles.indexOf('}', i));
+  };
+  check('the split releases its minimum width', /min-width:\s*0/.test(rule('.zv-split')), rule('.zv-split').slice(0, 120));
+  check('and so does the form pane, so the card can shrink to the screen', /min-width:\s*0/.test(rule('.zv-formpane')));
+  check('while the card still caps itself at the container', /max-width:\s*100%/.test(rule('.zv-card')));
 }
 
 console.log('\n\x1b[1mSplit sign-in screens\x1b[0m');
