@@ -28,13 +28,41 @@ for arg in "$@"; do
 done
 cd "$(dirname "$0")/.."
 
-# `|| true`, because grep exits 1 when nothing matches and `set -e`
-# would kill the script before the friendly message below ever printed.
-CHANGED=$(git status --short -- packages \
-  | grep -oE 'packages/[a-z]+' | sort -u | sed 's|packages/|@zevauth/|' || true)
+# Which packages changed since their version was last set.
+#
+# The first version of this looked at uncommitted changes, which meant
+# committing first — the right habit — made it report nothing to do.
+# Now: find the commit that set each package's current version, and
+# release the package if anything under it changed since. Name packages
+# explicitly to override: `npm run release -- js react`.
+EXPLICIT=""
+for arg in "$@"; do
+  case "$arg" in
+    --dry-run|patch|minor|major) ;;
+    *) EXPLICIT="$EXPLICIT @zevauth/${arg#@zevauth/}" ;;
+  esac
+done
+
+if [ -n "$EXPLICIT" ]; then
+  CHANGED="$EXPLICIT"
+else
+  CHANGED=""
+  for dir in packages/*/; do
+    name=$(node -p "require('./$dir/package.json').name")
+    version=$(node -p "require('./$dir/package.json').version")
+    # The commit that introduced the current version line.
+    since=$(git log -1 --format=%H -S"\"version\": \"$version\"" -- "$dir/package.json" 2>/dev/null || true)
+    if [ -z "$since" ]; then
+      CHANGED="$CHANGED $name"          # never released from this history
+    elif ! git diff --quiet "$since"..HEAD -- "$dir" || ! git diff --quiet -- "$dir"; then
+      CHANGED="$CHANGED $name"          # committed or uncommitted changes since
+    fi
+  done
+fi
 
 if [ -z "$CHANGED" ]; then
-  echo "Nothing changed under packages/. Commit or edit something first."
+  echo "Nothing changed in any package since its version was last set."
+  echo "Name one to force it: npm run release -- js"
   exit 0
 fi
 
