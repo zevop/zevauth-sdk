@@ -109,6 +109,9 @@ export function SignUp({
    */
   const wantsCode =
     client.emailVerification?.strategies?.includes('code') ?? false;
+  const wantsLink =
+    (client.emailVerification?.strategies?.includes('link') ??
+      false) || (client.emailVerification?.strategies?.length ?? 0) === 0;
 
   const hasPassword = client.signInMethods.includes('email_password');
   const hasZevId = client.signInMethods.includes('zevid');
@@ -163,9 +166,11 @@ export function SignUp({
           <>
             <h1 className="zv-title">Confirm your email</h1>
             <p className="zv-subtitle">
-              {wantsCode
-                ? `We sent a code to ${email}. Enter it below to finish setting up your account.`
-                : `We sent a link to ${email}. Open it to finish setting up your account.`}
+              {wantsCode && wantsLink
+                ? `We sent a link and a code to ${email}. Open the link, or enter the code below.`
+                : wantsCode
+                  ? `We sent a code to ${email}. Enter it below to finish setting up your account.`
+                  : `We sent a link to ${email}. Open it to finish setting up your account.`}
             </p>
             {error ? <Alert>{error}</Alert> : null}
 
