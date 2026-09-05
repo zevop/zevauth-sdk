@@ -642,6 +642,17 @@ console.log('\n\x1b[1mWhere the ZevID button sits\x1b[0m');
   );
 }
 
+console.log('\n\x1b[1mThe standalone ZevID button\x1b[0m');
+{
+  const c = clientIn({ loaded: true, user: null, methods: ['zevid'] });
+  const plain = render(c, <SignInWithZevId />);
+  check('renders a button with the default label and a mark svg', plain.includes('Continue with ZevID') && plain.includes('<svg'), plain.slice(0, 160));
+  check('no card, no attribution — it is a control, not a screen', !plain.includes('zv-card') && !plain.includes('Secured by'));
+  const labelled = render(c, <SignInWithZevId label="Connect with ZevID" shape="pill" />);
+  check('the label is overridable for a connect-on-profile use', labelled.includes('Connect with ZevID'));
+  check('and the shape is selectable', labelled.includes('data-shape="pill"'), labelled.slice(0, 160));
+}
+
 console.log('\n\x1b[1mThe words above the form\x1b[0m');
 
 {

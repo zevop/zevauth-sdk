@@ -8,6 +8,12 @@ export interface SignInWithZevIdProps {
   label?: string;
   /** `secondary` (default) suits a row of provider buttons. */
   variant?: 'primary' | 'secondary';
+  /**
+   * The corner shape. `default` follows your branding radius; `pill` is
+   * fully rounded; `square` has no radius. For dropping onto a member
+   * portal that already has its own button language.
+   */
+  shape?: 'default' | 'pill' | 'square';
   className?: string;
 }
 
@@ -31,6 +37,7 @@ export function SignInWithZevId({
   redirectUrl,
   label = 'Continue with ZevID',
   variant = 'secondary',
+  shape = 'default',
   className,
 }: SignInWithZevIdProps) {
   const { client } = useZevAuthContext('<SignInWithZevId>');
@@ -41,6 +48,7 @@ export function SignInWithZevId({
         type="button"
         className="zv-button"
         data-variant={variant}
+        data-shape={shape === 'default' ? undefined : shape}
         onClick={() => client.signIn.withZevId({ redirectUrl })}
       >
         <ZevMark size={13} />

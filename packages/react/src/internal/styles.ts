@@ -377,7 +377,9 @@ const AUTHORED = `
  * side by side would each be half a card wide and read as a choice
  * between equals, which Replace and Remove are not.
  */
-.zv-image-buttons .zv-button { width: auto; padding: 7px 12px; font-size: 12.5px; }
+.zv-image-buttons .zv-button[data-shape='pill'] { border-radius: 999px; }
+.zv-button[data-shape='square'] { border-radius: 0; }
+.zv-button { width: auto; padding: 7px 12px; font-size: 12.5px; }
 
 .zv-progress {
   height: 4px;
