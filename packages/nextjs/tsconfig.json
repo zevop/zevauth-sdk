@@ -6,6 +6,6 @@
     "jsx": "react-jsx",
     "composite": true
   },
-  "references": [{ "path": "../js" }, { "path": "../react" }],
+  "references": [{ "path": "../js" }, { "path": "../react" }, { "path": "../backend" }],
   "include": ["src"]
 }

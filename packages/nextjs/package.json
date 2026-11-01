@@ -59,9 +59,9 @@
     "react-dom": ">=18"
   },
   "dependencies": {
+    "@zevauth/backend": "^0.2.2",
     "@zevauth/js": "^0.2.0",
-    "@zevauth/react": "^0.2.7",
-    "jose": "^6.1.0"
+    "@zevauth/react": "^0.2.7"
   },
   "devDependencies": {
     "@types/react": "^19.2.14",

@@ -1,9 +1,10 @@
-import { bearerFrom, verifyZevAuthToken, type ZevAuthClaims } from './verify.js';
+import { bearerFrom, verifyZevAuthToken, type VerifyOptions, type ZevAuthClaims } from './verify.js';
 
-export interface ZevAuthServerConfig {
-  environmentId: string;
-  apiUrl?: string;
-}
+/**
+ * `environmentId` and `apiUrl`, plus any option the shared verifier
+ * takes (`clockSkewSeconds`, a local `jwks` with its `issuer`…).
+ */
+export interface ZevAuthServerConfig extends VerifyOptions {}
 
 export interface ServerAuth {
   isSignedIn: boolean;

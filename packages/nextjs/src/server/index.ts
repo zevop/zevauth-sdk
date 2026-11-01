@@ -1,6 +1,8 @@
 export {
   verifyZevAuthToken,
   bearerFrom,
+  ZevAuthVerifyError,
+  type VerifyErrorCode,
   type VerifyOptions,
   type ZevAuthClaims,
 } from './verify.js';
