@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { createZevAuth, type ZevAuth, type ZevAuthState } from '@zevauth/js';
 import { ZevAuthContext, mergeAppearance } from './internal/context.js';
 import type { Appearance } from './internal/appearance.js';
+import type { Localization } from './internal/localization.js';
 
 export interface ZevAuthProviderProps {
   publishableKey?: string;
@@ -20,6 +21,13 @@ export interface ZevAuthProviderProps {
    * plan on the server.
    */
   appearance?: Appearance;
+
+  /**
+   * The words every component prints, in your language or your voice.
+   * Any subset: whatever you leave out stays in English. A component's
+   * own `localization` merges over this.
+   */
+  localization?: Localization;
 
   children: ReactNode;
 }
@@ -45,6 +53,7 @@ export function ZevAuthProvider({
   client: provided,
   apiUrl,
   appearance,
+  localization,
   children,
 }: ZevAuthProviderProps) {
   const clientRef = useRef<ZevAuth | null>(provided ?? null);
@@ -101,8 +110,8 @@ export function ZevAuthProvider({
   );
 
   const value = useMemo(
-    () => ({ client, state, branding, appearance }),
-    [client, state, branding, appearance],
+    () => ({ client, state, branding, appearance, localization }),
+    [client, state, branding, appearance, localization],
   );
 
   return (

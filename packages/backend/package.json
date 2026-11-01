@@ -30,6 +30,10 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./verify": {
+      "types": "./dist/verify.d.ts",
+      "import": "./dist/verify.js"
+    },
     "./package.json": "./package.json"
   },
   "files": [
@@ -47,6 +51,9 @@
     "build": "tsc -b",
     "typecheck": "tsc -b",
     "verify": "tsx scripts/verify.ts"
+  },
+  "dependencies": {
+    "jose": "^6.1.0"
   },
   "devDependencies": {
     "tsx": "^4.20.6",

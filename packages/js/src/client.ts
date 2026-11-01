@@ -109,9 +109,26 @@ export class ZevAuth {
    * allowed — the call simply awaits the same promise — so an app never
    * has to sequence its own startup.
    */
-  async load(): Promise<void> {
-    if (this.loaded) return;
+  load(): Promise<void> {
+    if (this.loaded) return Promise.resolve();
+    /*
+     * One load at a time. A second caller while the first is in flight
+     * (React's strict-mode double effect, a Vue plugin and a component,
+     * two islands) used to start a second run: a second environment
+     * fetch, and a second attempt to spend a one-time handoff or email
+     * code that the first had already spent, which then surfaced as a
+     * sign-in error. Cleared on failure so a later call can retry.
+     */
+    this.loading ??= this.performLoad().catch((error: unknown) => {
+      this.loading = null;
+      throw error;
+    });
+    return this.loading;
+  }
 
+  private loading: Promise<void> | null = null;
+
+  private async performLoad(): Promise<void> {
     this.environment = await this.http.get<EnvironmentConfig>('/v1/environment');
 
     await this.completeHandoffIfPresent();

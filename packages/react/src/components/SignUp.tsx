@@ -2,6 +2,7 @@ import { useState, type FormEvent, type ReactNode } from 'react';
 import { ZevAuthError } from '@zevauth/js';
 import { useComponentAppearance } from '../internal/context.js';
 import type { Appearance } from '../internal/appearance.js';
+import { errorMessage, format, type Localization } from '../internal/localization.js';
 import { Brandable } from './Brandable.js';
 import {
   Alert,
@@ -42,6 +43,8 @@ export interface SignUpProps {
    * every screen should match; use this when one should not.
    */
   appearance?: Appearance;
+  /** The words on this component, merged over the provider's `localization`. */
+  localization?: Localization;
 }
 
 /**
@@ -61,6 +64,7 @@ export function SignUp({
   layout,
   aside,
   appearance,
+  localization,
   requireConfirmPassword = true,
 }: SignUpProps) {
   const {
@@ -69,7 +73,11 @@ export function SignUp({
     branding,
     appearance: appearanceLayers,
     el,
-  } = useComponentAppearance('<SignUp>', appearance);
+    strings,
+    isLocalized,
+  } = useComponentAppearance('<SignUp>', appearance, localization);
+  const t = strings.signUp;
+  const c = strings.common;
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -140,15 +148,15 @@ export function SignUp({
       .catch((err) => {
         setError(
           err instanceof ZevAuthError
-            ? err.message
-            : 'Something went wrong. Please try again.',
+            ? errorMessage(strings, err, c.genericError)
+            : c.genericError,
         );
       })
       .finally(() => setIsBusy(false));
   };
 
   return (
-    <Brandable branding={branding} appearance={appearanceLayers} el={el} className={className}>
+    <Brandable branding={branding} appearance={appearanceLayers} el={el} strings={strings} className={className}>
       <Shell
         layout={resolvedLayout}
         align={branding?.contentAlign ?? 'center'}
@@ -160,13 +168,13 @@ export function SignUp({
 
         {awaitingVerification ? (
           <>
-            <h1 {...el('title')}>Confirm your email</h1>
+            <h1 {...el('title')}>{t.verifyTitle}</h1>
             <p {...el('subtitle')}>
               {wantsCode && wantsLink
-                ? `We sent a link and a code to ${email}. Open the link, or enter the code below.`
+                ? format(t.verifyBodyLinkAndCode, { email })
                 : wantsCode
-                  ? `We sent a code to ${email}. Enter it below to finish setting up your account.`
-                  : `We sent a link to ${email}. Open it to finish setting up your account.`}
+                  ? format(t.verifyBodyCode, { email })
+                  : format(t.verifyBodyLink, { email })}
             </p>
             {error ? <Alert>{error}</Alert> : null}
 
@@ -190,8 +198,8 @@ export function SignUp({
                     .catch((err: unknown) =>
                       setError(
                         err instanceof ZevAuthError
-                          ? err.message
-                          : 'That code was not accepted.',
+                          ? errorMessage(strings, err, t.codeRejected)
+                          : t.codeRejected,
                       ),
                     )
                     .finally(() => setIsBusy(false));
@@ -199,7 +207,7 @@ export function SignUp({
               >
                 <div {...el('field')}>
                   <label {...el('label')} htmlFor="zv-verify-code">
-                    Verification code
+                    {t.verifyCodeLabel}
                   </label>
                   <input
                     id="zv-verify-code"
@@ -222,7 +230,7 @@ export function SignUp({
                   disabled={isBusy || code.length === 0}
                 >
                   {isBusy ? <Spinner /> : null}
-                  Confirm
+                  {t.verifySubmit}
                 </button>
               </form>
             ) : null}
@@ -230,9 +238,9 @@ export function SignUp({
         ) : (
           <>
             <Heading
-              title={branding?.signUpTitle}
+              title={isLocalized('signUp', 'title') ? t.title : branding?.signUpTitle}
               subtitle={branding?.signUpSubtitle}
-              fallbackTitle="Create your account"
+              fallbackTitle={t.title}
             />
             {error ? <Alert>{error}</Alert> : null}
 
@@ -253,9 +261,9 @@ export function SignUp({
                     one control on the page that leaves the site.
                   */}
                   <ZevMark size={13} />
-                  Continue with ZevID
+                  {c.continueWithZevId}
                 </button>
-                {hasPassword ? <Divider label="or" /> : null}
+                {hasPassword ? <Divider label={c.or} /> : null}
               </>
             ) : null}
 
@@ -263,7 +271,7 @@ export function SignUp({
               <form {...el('fields')} onSubmit={onSubmit}>
                 <div {...el('field')}>
                   <label {...el('label')} htmlFor="zv-firstname">
-                    First name
+                    {t.firstName}
                   </label>
                   <input
                     id="zv-firstname"
@@ -273,12 +281,12 @@ export function SignUp({
                     disabled={isBusy}
                     autoComplete="given-name"
                   />
-                  <span {...el('hint')}>Optional.</span>
+                  <span {...el('hint')}>{t.optional}</span>
                 </div>
 
                 <div {...el('field')}>
                   <label {...el('label')} htmlFor="zv-signup-email">
-                    Email
+                    {c.email}
                   </label>
                   <input
                     id="zv-signup-email"
@@ -294,7 +302,7 @@ export function SignUp({
 
                 <div {...el('field')}>
                   <label {...el('label')} htmlFor="zv-signup-password">
-                    Password
+                    {c.password}
                   </label>
                   <input
                     id="zv-signup-password"
@@ -308,7 +316,7 @@ export function SignUp({
                     autoComplete="new-password"
                     required
                   />
-                  <span {...el('hint')}>8 characters or more.</span>
+                  <span {...el('hint')}>{t.passwordHint}</span>
                 </div>
 
                 {/*
@@ -324,7 +332,7 @@ export function SignUp({
                 {requireConfirmPassword ? (
                   <div {...el('field')}>
                     <label {...el('label')} htmlFor="zv-signup-confirm">
-                      Confirm password
+                      {t.confirmPassword}
                     </label>
                     <input
                       id="zv-signup-confirm"
@@ -342,7 +350,7 @@ export function SignUp({
                         box is telling somebody off for not finishing. */}
                     {mismatch ? (
                       <span {...el('fieldError')}>
-                        These passwords do not match.
+                        {t.passwordsDiffer}
                       </span>
                     ) : null}
                   </div>
@@ -358,15 +366,14 @@ export function SignUp({
                   }
                 >
                   {isBusy ? <Spinner /> : null}
-                  Create account
+                  {t.submit}
                 </button>
               </form>
             ) : null}
 
             {!hasPassword && !hasZevId && state.isLoaded ? (
               <div {...el('notice')}>
-                No sign-up methods are enabled for this environment. Turn one
-                on under Authentication in the ZevAuth console.
+                {t.noMethods}
               </div>
             ) : null}
           </>

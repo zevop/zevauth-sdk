@@ -2,6 +2,8 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { ZevAuthError } from '@zevauth/js';
 import { useComponentAppearance } from '../internal/context.js';
 import type { Appearance } from '../internal/appearance.js';
+import { errorMessage, format, type Localization } from '../internal/localization.js';
+import { ActiveDevices } from './ActiveDevices.js';
 import { Brandable } from './Brandable.js';
 import { Alert, Spinner } from './parts.js';
 import { ImageField } from './ImageField.js';
@@ -25,6 +27,20 @@ export interface UserProfileProps {
    * wrong with their account.
    */
   defaultPasswordOpen?: boolean;
+  /**
+   * `'stacked'` (default) is one column, as it has always been.
+   * `'sidebar'` puts Profile and Security in a navigation column beside
+   * the content, for a settings page or a dialog with room for it.
+   * `section` still limits what is offered.
+   */
+  variant?: 'stacked' | 'sidebar';
+  /**
+   * List the devices this person is signed in on, under Security, with
+   * a way to sign each one out. Off by default.
+   */
+  showSessions?: boolean;
+  /** The words on this component, merged over the provider's `localization`. */
+  localization?: Localization;
   /**
    * How this one component looks, merged over the provider's
    * `appearance`. See `Appearance` for the console fields, `variables`
@@ -51,7 +67,10 @@ export interface UserProfileProps {
 export function UserProfile({
   section = 'all',
   defaultPasswordOpen = false,
+  variant = 'stacked',
+  showSessions = false,
   appearance,
+  localization,
   className,
 }: UserProfileProps) {
   const {
@@ -60,7 +79,12 @@ export function UserProfile({
     branding,
     appearance: appearanceLayers,
     el,
-  } = useComponentAppearance('<UserProfile>', appearance);
+    strings,
+  } = useComponentAppearance('<UserProfile>', appearance, localization);
+  const t = strings.userProfile;
+  const [activeSection, setActiveSection] = useState<'profile' | 'security'>(
+    section === 'security' ? 'security' : 'profile',
+  );
 
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -109,7 +133,7 @@ export function UserProfile({
       .then(() => setSavedProfile(true))
       .catch((err) =>
         setProfileError(
-          err instanceof ZevAuthError ? err.message : 'Could not save.',
+          err instanceof ZevAuthError ? errorMessage(strings, err, t.saveFailed) : t.saveFailed,
         ),
       )
       .finally(() => setIsSavingProfile(false));
@@ -127,8 +151,8 @@ export function UserProfile({
       .catch((err) =>
         setPasswordError(
           err instanceof ZevAuthError
-            ? err.message
-            : 'Could not change your password.',
+            ? errorMessage(strings, err, t.passwordChangeFailed)
+            : t.passwordChangeFailed,
         ),
       )
       .finally(() => {
@@ -143,313 +167,365 @@ export function UserProfile({
       });
   };
 
+  const profileForm = (
+    <form {...el('fields')} onSubmit={onSaveProfile}>
+      {profileError ? <Alert>{profileError}</Alert> : null}
+
+      {/*
+        First, because it is the field people came to change and
+        the only one they can see the result of. It saves on its
+        own rather than waiting for the form's button: an upload
+        has already happened by the time the picture appears, and
+        a Save that seemed to be needed afterwards would be a
+        second, confusing commitment to something already done.
+      */}
+      <ImageField
+        label={t.photo}
+        value={user.imageUrl ?? null}
+        isDisabled={isSavingProfile}
+        upload={(file, onProgress) =>
+          client.me.uploadAvatar({ file, onProgress })
+        }
+        onSave={(imageUrl) => client.me.update({ imageUrl })}
+      />
+
+      <div {...el('field')}>
+        <label {...el('label')} htmlFor="zv-profile-first">
+          {t.firstName}
+        </label>
+        <input
+          id="zv-profile-first"
+          {...el('input')}
+          value={firstName}
+          onChange={(e) => setFirstName(e.target.value)}
+          disabled={isSavingProfile}
+          autoComplete="given-name"
+        />
+      </div>
+
+      <div {...el('field')}>
+        <label {...el('label')} htmlFor="zv-profile-last">
+          {t.lastName}
+        </label>
+        <input
+          id="zv-profile-last"
+          {...el('input')}
+          value={lastName}
+          onChange={(e) => setLastName(e.target.value)}
+          disabled={isSavingProfile}
+          autoComplete="family-name"
+        />
+      </div>
+
+      <div {...el('field')}>
+        <label {...el('label')}>{t.email}</label>
+        {/*
+          The address on the account, which is the current one
+          until a change is proved. Not editable in place: the new
+          address is asked for separately, below.
+        */}
+        <input
+          {...el('input')}
+          value={user.email ?? ''}
+          disabled
+          readOnly
+        />
+
+        {pendingEmail ? (
+          <div {...el('notice')}>
+            {format(t.pendingEmail, { email: pendingEmail })}{' '}
+            <button
+              type="button"
+              {...el(['button', 'buttonLink'], { width: 'auto', display: 'inline-flex' })}
+              data-variant="ghost"
+              onClick={() => {
+                void client.me.cancelEmailChange().then(() => {
+                  setPendingEmail(null);
+                  setNewEmail('');
+                });
+              }}
+            >
+              {t.cancel}
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            {...el('moreToggle', { justifyContent: 'flex-start', padding: '2px 0' })}
+            aria-expanded={isEmailOpen}
+            onClick={() => setIsEmailOpen((open) => !open)}
+          >
+            {t.changeEmail}
+          </button>
+        )}
+      </div>
+
+      {/*
+        Typing a new address changes nothing. A link goes there and
+        the account keeps its current address until that link is
+        opened, or anybody with a borrowed session could move an
+        account somewhere they control and every recovery path
+        would follow them.
+      */}
+      <div
+        className="zv-reveal"
+        data-open={isEmailOpen && !pendingEmail ? 'true' : 'false'}
+        inert={!isEmailOpen || Boolean(pendingEmail)}
+      >
+        <div
+          style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
+        >
+          {emailError ? <Alert>{emailError}</Alert> : null}
+
+          <div {...el('field')}>
+            <label {...el('label')} htmlFor="zv-new-email">
+              {t.newEmail}
+            </label>
+            <input
+              id="zv-new-email"
+              {...el('input')}
+              type="email"
+              value={newEmail}
+              onChange={(e) => setNewEmail(e.target.value)}
+              disabled={isSavingEmail}
+              autoComplete="email"
+            />
+            <span {...el('hint')}>
+              {t.newEmailHint}
+            </span>
+          </div>
+
+          <div {...el('field')}>
+            <label {...el('label')} htmlFor="zv-email-password">
+              {t.currentPassword}
+            </label>
+            <input
+              id="zv-email-password"
+              {...el('input')}
+              type="password"
+              value={emailPassword}
+              onChange={(e) => setEmailPassword(e.target.value)}
+              disabled={isSavingEmail}
+              autoComplete="current-password"
+            />
+          </div>
+
+          <button
+            type="button"
+            {...el(['button', 'buttonSecondary'])}
+            data-variant="secondary"
+            disabled={isSavingEmail || !newEmail}
+            onClick={() => {
+              setIsSavingEmail(true);
+              setEmailError(null);
+              void client.me
+                .requestEmailChange({
+                  newEmail,
+                  currentPassword: emailPassword || undefined,
+                })
+                .then((result) => {
+                  setPendingEmail(result.pendingEmail);
+                  setIsEmailOpen(false);
+                })
+                .catch((err) =>
+                  setEmailError(
+                    err instanceof ZevAuthError
+                      ? errorMessage(strings, err, t.emailChangeFailed)
+                      : t.emailChangeFailed,
+                  ),
+                )
+                .finally(() => {
+                  setIsSavingEmail(false);
+                  // Never left in the field, for the same reason
+                  // the password fields are cleared below.
+                  setEmailPassword('');
+                });
+            }}
+          >
+            {isSavingEmail ? <Spinner /> : null}
+            {t.sendConfirmation}
+          </button>
+        </div>
+      </div>
+
+      <button
+        type="submit"
+        {...el(['button', 'buttonPrimary'])}
+        data-variant="primary"
+        disabled={isSavingProfile}
+      >
+        {isSavingProfile ? <Spinner /> : null}
+        {savedProfile && !isSavingProfile ? t.saved : t.save}
+      </button>
+    </form>
+  );
+
+  const passwordForm = (
+    <form {...el('fields')} onSubmit={onChangePassword}>
+      {/*
+      A disclosure, not a heading.
+
+      The password fields are closed until somebody asks for them:
+      most visits here are to change a name, and two empty password
+      boxes on arrival invite a password manager to fill them and a
+      person to wonder what is wrong.
+    */}
+      <button
+        type="button"
+        {...el('moreToggle', { justifyContent: 'space-between', padding: '4px 0' })}
+        aria-expanded={isPasswordOpen}
+        onClick={() => setIsPasswordOpen((open) => !open)}
+      >
+        <span {...el('label', { fontSize: 'var(--zv-font-size)' })}>
+          {t.changePassword}
+        </span>
+        <svg
+          className="zv-chevron"
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          aria-hidden="true"
+        >
+          <path d="M6 9l6 6 6-6" />
+        </svg>
+      </button>
+
+      <div
+        className="zv-reveal"
+        data-open={isPasswordOpen ? 'true' : 'false'}
+        inert={!isPasswordOpen}
+      >
+        <div
+          style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
+        >
+          {passwordError ? <Alert>{passwordError}</Alert> : null}
+          {revoked !== null ? (
+            <div {...el('notice')}>
+              {t.passwordChanged}
+              {revoked > 0
+                ? format(revoked === 1 ? t.otherSessionSignedOut : t.otherSessionsSignedOut, { count: revoked })
+                : ''}
+            </div>
+          ) : null}
+
+          <div {...el('field')}>
+            <label {...el('label')} htmlFor="zv-current-password">
+              {t.currentPassword}
+            </label>
+            <input
+              id="zv-current-password"
+              {...el('input')}
+              type="password"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              disabled={isSavingPassword}
+              autoComplete="current-password"
+            />
+          </div>
+
+          <div {...el('field')}>
+            <label {...el('label')} htmlFor="zv-new-password">
+              {t.newPassword}
+            </label>
+            <input
+              id="zv-new-password"
+              {...el('input')}
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              disabled={isSavingPassword}
+              autoComplete="new-password"
+            />
+            <span {...el('hint')}>
+              {t.newPasswordHint}
+            </span>
+          </div>
+
+          <button
+            type="submit"
+            {...el(['button', 'buttonSecondary'])}
+            data-variant="secondary"
+            disabled={
+              isSavingPassword ||
+              !currentPassword ||
+              newPassword.length < 8
+            }
+          >
+            {isSavingPassword ? <Spinner /> : null}
+            {t.changePassword}
+          </button>
+        </div>
+      </div>
+    </form>
+  );
+
+  const devices = showSessions ? <ActiveDevices client={client} /> : null;
+
+  if (variant === 'sidebar') {
+    const sections = (['profile', 'security'] as const).filter(
+      (key) => section === 'all' || section === key,
+    );
+    const current = sections.includes(activeSection) ? activeSection : sections[0];
+
+    return (
+      <Brandable branding={branding} appearance={appearanceLayers} el={el} strings={strings} className={className}>
+        <div {...el('card')} data-layout="sidebar">
+          <nav {...el('navigation')} aria-label={t.navTitle}>
+            <div className="zv-nav-heading">
+              <h1 {...el('title', { textAlign: 'left' })}>{t.navTitle}</h1>
+              <p {...el('subtitle', { textAlign: 'left' })}>{t.navSubtitle}</p>
+            </div>
+            {sections.map((key) => (
+              <button
+                key={key}
+                type="button"
+                {...el('navigationItem')}
+                aria-current={current === key ? 'page' : undefined}
+                onClick={() => setActiveSection(key)}
+              >
+                {key === 'profile' ? t.profileSection : t.securitySection}
+              </button>
+            ))}
+          </nav>
+          <div {...el('panel')}>
+            <h2 {...el('sectionTitle')}>
+              {current === 'profile' ? t.profileSection : t.securitySection}
+            </h2>
+            {current === 'profile' ? (
+              profileForm
+            ) : (
+              <>
+                {passwordForm}
+                {devices ? <hr {...el('sectionDivider')} /> : null}
+                {devices}
+              </>
+            )}
+          </div>
+        </div>
+      </Brandable>
+    );
+  }
+
   return (
-    <Brandable branding={branding} appearance={appearanceLayers} el={el} className={className}>
+    <Brandable branding={branding} appearance={appearanceLayers} el={el} strings={strings} className={className}>
       <div {...el('card')} data-size="wide">
         {section !== 'security' ? (
           <h1 {...el('title', { textAlign: 'left' })}>
-            Your profile
+            {t.title}
           </h1>
         ) : null}
 
-        {section !== 'security' ? (
-          <form {...el('fields')} onSubmit={onSaveProfile}>
-            {profileError ? <Alert>{profileError}</Alert> : null}
-
-            {/*
-              First, because it is the field people came to change and
-              the only one they can see the result of. It saves on its
-              own rather than waiting for the form's button: an upload
-              has already happened by the time the picture appears, and
-              a Save that seemed to be needed afterwards would be a
-              second, confusing commitment to something already done.
-            */}
-            <ImageField
-              label="Photo"
-              value={user.imageUrl ?? null}
-              isDisabled={isSavingProfile}
-              upload={(file, onProgress) =>
-                client.me.uploadAvatar({ file, onProgress })
-              }
-              onSave={(imageUrl) => client.me.update({ imageUrl })}
-            />
-
-            <div {...el('field')}>
-              <label {...el('label')} htmlFor="zv-profile-first">
-                First name
-              </label>
-              <input
-                id="zv-profile-first"
-                {...el('input')}
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-                disabled={isSavingProfile}
-                autoComplete="given-name"
-              />
-            </div>
-
-            <div {...el('field')}>
-              <label {...el('label')} htmlFor="zv-profile-last">
-                Last name
-              </label>
-              <input
-                id="zv-profile-last"
-                {...el('input')}
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-                disabled={isSavingProfile}
-                autoComplete="family-name"
-              />
-            </div>
-
-            <div {...el('field')}>
-              <label {...el('label')}>Email</label>
-              {/*
-                The address on the account, which is the current one
-                until a change is proved. Not editable in place: the new
-                address is asked for separately, below.
-              */}
-              <input
-                {...el('input')}
-                value={user.email ?? ''}
-                disabled
-                readOnly
-              />
-
-              {pendingEmail ? (
-                <div {...el('notice')}>
-                  Waiting for {pendingEmail} to be confirmed. Nothing changes
-                  until the link we sent there is opened.{' '}
-                  <button
-                    type="button"
-                    {...el(['button', 'buttonLink'], { width: 'auto', display: 'inline-flex' })}
-                    data-variant="ghost"
-                    onClick={() => {
-                      void client.me.cancelEmailChange().then(() => {
-                        setPendingEmail(null);
-                        setNewEmail('');
-                      });
-                    }}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  {...el('moreToggle', { justifyContent: 'flex-start', padding: '2px 0' })}
-                  aria-expanded={isEmailOpen}
-                  onClick={() => setIsEmailOpen((open) => !open)}
-                >
-                  Change your email address
-                </button>
-              )}
-            </div>
-
-            {/*
-              Typing a new address changes nothing. A link goes there and
-              the account keeps its current address until that link is
-              opened, or anybody with a borrowed session could move an
-              account somewhere they control and every recovery path
-              would follow them.
-            */}
-            <div
-              className="zv-reveal"
-              data-open={isEmailOpen && !pendingEmail ? 'true' : 'false'}
-              inert={!isEmailOpen || Boolean(pendingEmail)}
-            >
-              <div
-                style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
-              >
-                {emailError ? <Alert>{emailError}</Alert> : null}
-
-                <div {...el('field')}>
-                  <label {...el('label')} htmlFor="zv-new-email">
-                    New email address
-                  </label>
-                  <input
-                    id="zv-new-email"
-                    {...el('input')}
-                    type="email"
-                    value={newEmail}
-                    onChange={(e) => setNewEmail(e.target.value)}
-                    disabled={isSavingEmail}
-                    autoComplete="email"
-                  />
-                  <span {...el('hint')}>
-                    We will send a link there. Your address does not change
-                    until you open it.
-                  </span>
-                </div>
-
-                <div {...el('field')}>
-                  <label {...el('label')} htmlFor="zv-email-password">
-                    Current password
-                  </label>
-                  <input
-                    id="zv-email-password"
-                    {...el('input')}
-                    type="password"
-                    value={emailPassword}
-                    onChange={(e) => setEmailPassword(e.target.value)}
-                    disabled={isSavingEmail}
-                    autoComplete="current-password"
-                  />
-                </div>
-
-                <button
-                  type="button"
-                  {...el(['button', 'buttonSecondary'])}
-                  data-variant="secondary"
-                  disabled={isSavingEmail || !newEmail}
-                  onClick={() => {
-                    setIsSavingEmail(true);
-                    setEmailError(null);
-                    void client.me
-                      .requestEmailChange({
-                        newEmail,
-                        currentPassword: emailPassword || undefined,
-                      })
-                      .then((result) => {
-                        setPendingEmail(result.pendingEmail);
-                        setIsEmailOpen(false);
-                      })
-                      .catch((err) =>
-                        setEmailError(
-                          err instanceof ZevAuthError
-                            ? err.message
-                            : 'Could not request that change.',
-                        ),
-                      )
-                      .finally(() => {
-                        setIsSavingEmail(false);
-                        // Never left in the field, for the same reason
-                        // the password fields are cleared below.
-                        setEmailPassword('');
-                      });
-                  }}
-                >
-                  {isSavingEmail ? <Spinner /> : null}
-                  Send confirmation
-                </button>
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              {...el(['button', 'buttonPrimary'])}
-              data-variant="primary"
-              disabled={isSavingProfile}
-            >
-              {isSavingProfile ? <Spinner /> : null}
-              {savedProfile && !isSavingProfile ? 'Saved' : 'Save'}
-            </button>
-          </form>
-        ) : null}
+        {section !== 'security' ? profileForm : null}
 
         {section === 'all' ? <hr {...el('sectionDivider')} /> : null}
 
-        {section !== 'profile' ? (
-          <form {...el('fields')} onSubmit={onChangePassword}>
-            {/*
-            A disclosure, not a heading.
+        {section !== 'profile' ? passwordForm : null}
 
-            The password fields are closed until somebody asks for them:
-            most visits here are to change a name, and two empty password
-            boxes on arrival invite a password manager to fill them and a
-            person to wonder what is wrong.
-          */}
-            <button
-              type="button"
-              {...el('moreToggle', { justifyContent: 'space-between', padding: '4px 0' })}
-              aria-expanded={isPasswordOpen}
-              onClick={() => setIsPasswordOpen((open) => !open)}
-            >
-              <span {...el('label', { fontSize: 'var(--zv-font-size)' })}>
-                Change password
-              </span>
-              <svg
-                className="zv-chevron"
-                width="12"
-                height="12"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                aria-hidden="true"
-              >
-                <path d="M6 9l6 6 6-6" />
-              </svg>
-            </button>
-
-            <div
-              className="zv-reveal"
-              data-open={isPasswordOpen ? 'true' : 'false'}
-              inert={!isPasswordOpen}
-            >
-              <div
-                style={{ display: 'flex', flexDirection: 'column', gap: 12 }}
-              >
-                {passwordError ? <Alert>{passwordError}</Alert> : null}
-                {revoked !== null ? (
-                  <div {...el('notice')}>
-                    Password changed.
-                    {revoked > 0
-                      ? ` We signed out ${revoked} other ${revoked === 1 ? 'session' : 'sessions'}.`
-                      : ''}
-                  </div>
-                ) : null}
-
-                <div {...el('field')}>
-                  <label {...el('label')} htmlFor="zv-current-password">
-                    Current password
-                  </label>
-                  <input
-                    id="zv-current-password"
-                    {...el('input')}
-                    type="password"
-                    value={currentPassword}
-                    onChange={(e) => setCurrentPassword(e.target.value)}
-                    disabled={isSavingPassword}
-                    autoComplete="current-password"
-                  />
-                </div>
-
-                <div {...el('field')}>
-                  <label {...el('label')} htmlFor="zv-new-password">
-                    New password
-                  </label>
-                  <input
-                    id="zv-new-password"
-                    {...el('input')}
-                    type="password"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    disabled={isSavingPassword}
-                    autoComplete="new-password"
-                  />
-                  <span {...el('hint')}>
-                    8 characters or more. Your other devices will be signed out.
-                  </span>
-                </div>
-
-                <button
-                  type="submit"
-                  {...el(['button', 'buttonSecondary'])}
-                  data-variant="secondary"
-                  disabled={
-                    isSavingPassword ||
-                    !currentPassword ||
-                    newPassword.length < 8
-                  }
-                >
-                  {isSavingPassword ? <Spinner /> : null}
-                  Change password
-                </button>
-              </div>
-            </div>
-          </form>
-        ) : null}
+        {section !== 'profile' && devices ? <hr {...el('sectionDivider')} /> : null}
+        {section !== 'profile' ? devices : null}
       </div>
     </Brandable>
   );

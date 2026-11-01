@@ -19,8 +19,16 @@ import { SignInWithZevId } from '../src/components/SignInWithZevId';
 import { readableOn } from '../src/components/Brandable';
 import { OrganizationProfile } from '../src/components/OrganizationProfile';
 import { SignUp } from '../src/components/SignUp';
+import { CreateOrganization, createOrganizationErrors } from '../src/components/CreateOrganization';
+import { OrganizationList } from '../src/components/OrganizationList';
+import { OrganizationSwitcher } from '../src/components/OrganizationSwitcher';
+import { UserAvatar } from '../src/components/UserAvatar';
+import { en, errorMessage, mergeLocalization } from '../src/internal/localization';
+import { describeUserAgent } from '../src/internal/people';
+import { ZevAuthError } from '@zevauth/js';
 import { componentStyles, getComponentStyles } from '../src/internal/styles';
 import type { Appearance } from '../src/internal/appearance';
+import type { Localization } from '../src/internal/localization';
 import {
   EmailUnverified,
   EmailVerified,
@@ -123,7 +131,7 @@ function clientIn(state: {
   return client;
 }
 
-function render(client: ZevAuth, children: ReactNode, appearance?: Appearance): string {
+function render(client: ZevAuth, children: ReactNode, appearance?: Appearance, localization?: Localization): string {
   /*
    * `<!-- -->` separators are stripped. React inserts one between
    * adjacent text expressions so it can find the boundaries again when
@@ -132,7 +140,7 @@ function render(client: ZevAuth, children: ReactNode, appearance?: Appearance): 
    * component.
    */
   return renderToString(
-    <ZevAuthProvider client={client} appearance={appearance}>{children}</ZevAuthProvider>,
+    <ZevAuthProvider client={client} appearance={appearance} localization={localization}>{children}</ZevAuthProvider>,
   ).replaceAll('<!-- -->', '');
 }
 
@@ -509,6 +517,80 @@ console.log('\n\x1b[1mAppearance: variables and elements\x1b[0m');
     <SignUp appearance={{ signUpTitle: 'Code title' }} />,
   );
   check('a signUpTitle set in code is the one printed', signUp.includes('Code title') && !signUp.includes('Console title'));
+}
+
+console.log('\n\x1b[1mOrganization suite, profiles and avatar (all opt-in)\x1b[0m');
+{
+  const signedIn = { loaded: true, user: USER } as const;
+  const acme = { id: 'org_1', name: 'Acme', slug: 'acme', role: 'admin', permissions: ['org:members:manage', 'org:manage', 'org:delete'] };
+
+  const create = render(clientIn({ ...signedIn }), <CreateOrganization />);
+  check('CreateOrganization asks for a name', create.includes('Create organization') && create.includes('id="zv-org-name"'));
+  check('and no slug unless asked, since the browser cannot know the policy', !create.includes('zv-org-slug'));
+  check('with showSlug it asks for one', render(clientIn({ ...signedIn }), <CreateOrganization showSlug />).includes('zv-org-slug'));
+  check('and renders nothing for somebody signed out', render(clientIn({ loaded: true, user: null }), <CreateOrganization />) === '');
+
+  const codes = createOrganizationErrors(en);
+  const taken = new ZevAuthError('slug taken (server)', 'organization_slug_taken', 409);
+  check('a known refusal is explained in our words', errorMessage(en, taken, 'x', codes) === en.createOrganization.slugTaken);
+  check('the developer’s errors map still wins over ours', errorMessage(mergeLocalization({ errors: { organization_slug_taken: 'Pris.' } }), taken, 'x', codes) === 'Pris.');
+  check('an unknown code falls back to the server’s message', errorMessage(en, new ZevAuthError('Server says', 'weird', 400), 'x', codes) === 'Server says');
+
+  const list = render(clientIn({ ...signedIn }), <OrganizationList />);
+  check('OrganizationList is a chooser named for the app', list.includes('Choose an account') && list.includes('to continue to Northwind'));
+  check('offering the personal account by default', list.includes('Personal account'));
+  check('and no create row unless asked', !list.includes('data-kind="create"'));
+  check('with createOrganization it offers one', render(clientIn({ ...signedIn }), <OrganizationList createOrganization="inline" />).includes('data-kind="create"'));
+  check('allowPersonal={false} leaves the personal account out', !render(clientIn({ ...signedIn }), <OrganizationList allowPersonal={false} />).includes('Personal account'));
+  check('its words follow localization', render(clientIn({ ...signedIn }), <OrganizationList localization={{ organizationList: { title: 'Choisir un compte' } }} />).includes('Choisir un compte'));
+
+  check('the switcher still hides for somebody in no organization', render(clientIn({ ...signedIn }), <OrganizationSwitcher />) === '');
+  check('but shows when it can create one for them', render(clientIn({ ...signedIn }), <OrganizationSwitcher createOrganizationMode="inline" />).includes('zv-trigger'));
+
+  const plainOrg = render(clientIn({ ...signedIn, organization: acme }), <OrganizationProfile />);
+  check('OrganizationProfile offers no leave or delete by default', !plainOrg.includes('Leave organization') && !plainOrg.includes('Delete organization'));
+  const exits = render(clientIn({ ...signedIn, organization: acme }), <OrganizationProfile showLeave showDelete />);
+  check('with showLeave and showDelete it offers both', exits.includes('Leave organization') && exits.includes('Delete organization') && exits.includes('data-variant="danger"'));
+  const noDelete = render(clientIn({ ...signedIn, organization: { ...acme, permissions: ['org:members:manage'] } }), <OrganizationProfile showDelete />);
+  check('but delete only to somebody with org:delete', !noDelete.includes('Delete organization'));
+  const orgSidebar = render(clientIn({ ...signedIn, organization: acme }), <OrganizationProfile variant="sidebar" />);
+  check('the sidebar variant has General and Members navigation', orgSidebar.includes('data-layout="sidebar"') && orgSidebar.includes('zv-nav') && orgSidebar.includes('>General<') && orgSidebar.includes('>Members<'));
+
+  const profileSidebar = render(clientIn({ ...signedIn }), <UserProfile variant="sidebar" />);
+  check('UserProfile has a sidebar variant with Profile and Security', profileSidebar.includes('data-layout="sidebar"') && profileSidebar.includes('>Profile<') && profileSidebar.includes('>Security<'));
+  check('which still honours section', !render(clientIn({ ...signedIn }), <UserProfile variant="sidebar" section="security" />).includes('>Profile<'));
+  check('active devices are off by default', !render(clientIn({ ...signedIn }), <UserProfile />).includes('Active devices'));
+  check('and listed with showSessions', render(clientIn({ ...signedIn }), <UserProfile showSessions />).includes('Active devices'));
+  check('its words follow localization', render(clientIn({ ...signedIn }), <UserProfile localization={{ userProfile: { title: 'Votre profil' } }} />).includes('Votre profil'));
+
+  const avatar = render(clientIn({ ...signedIn }), <UserAvatar size={40} />);
+  check('UserAvatar shows initials and takes a size', avatar.includes('>A<') && avatar.includes('width:40px'));
+  check('and renders nothing when signed out', render(clientIn({ loaded: true, user: null }), <UserAvatar />) === '');
+
+  check('devices are described in words people recognise', JSON.stringify(describeUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Chrome/130.0 Safari/537.36')) === '{"browser":"Chrome","os":"macOS"}');
+  check('Edge is not mistaken for Chrome', describeUserAgent('Mozilla/5.0 (Windows NT 10.0) Chrome/130.0 Safari/537.36 Edg/130.0')?.browser === 'Edge');
+}
+
+console.log('\n\x1b[1mLocalization\x1b[0m');
+{
+  const base = { loaded: true, user: null, methods: ['email_password', 'zevid'] } as const;
+  const fr = render(clientIn({ ...base }), <SignIn />, undefined, {
+    common: { email: 'E-mail', password: 'Mot de passe', or: 'ou', securedBy: 'Sécurisé par' },
+    signIn: { submit: 'Se connecter', forgotPassword: 'Mot de passe oublié ?' },
+  });
+  check('labels and buttons print in the developer’s words', fr.includes('Mot de passe') && fr.includes('Se connecter') && fr.includes('Sécurisé par') && fr.includes('>ou<'));
+  check('and anything left out stays English', fr.includes('Continue with ZevID'));
+
+  const consoleTitle = render(clientIn({ ...base, branding: { signInTitle: 'From the console' } }), <SignIn />, undefined, { signIn: { submit: 'Go' } });
+  check('the console heading still wins over our default wording', consoleTitle.includes('From the console'));
+  const codeTitle = render(clientIn({ ...base, branding: { signInTitle: 'From the console' } }), <SignIn localization={{ signIn: { title: 'Connexion' } }} />);
+  check('but a heading set in localization wins over the console', codeTitle.includes('Connexion') && !codeTitle.includes('From the console'));
+
+  const merged = render(clientIn({ ...base }), <SignIn localization={{ signIn: { submit: 'Local' } }} />, undefined, { signIn: { forgotPassword: 'Provider' } });
+  check('a component merges its words over the provider’s', merged.includes('Local') && merged.includes('Provider'));
+
+  const menu = render(clientIn({ loaded: true, user: USER }), <UserButton />, undefined, { userButton: { menuLabel: 'Menu de {name}' } });
+  check('placeholders are filled in', menu.includes('Menu de A'));
 }
 
 console.log('\n\x1b[1mNamed themes\x1b[0m');

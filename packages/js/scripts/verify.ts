@@ -54,6 +54,7 @@ const USER = {
 };
 
 interface Call {
+  method: string;
   path: string;
   body: any;
   auth: string | null;
@@ -79,7 +80,8 @@ function fakeApi(options: {
     const path = new URL(url).pathname;
     const body = init.body ? JSON.parse(init.body as string) : undefined;
     const auth = (init.headers as Record<string, string>)?.Authorization ?? null;
-    calls.push({ path, body, auth });
+    const method = (init.method ?? 'GET').toUpperCase();
+    calls.push({ method, path, body, auth });
 
     const json = (status: number, payload: unknown) =>
       new Response(JSON.stringify(payload), { status });
@@ -169,6 +171,50 @@ function fakeApi(options: {
       });
     }
 
+    if (path === '/v1/me/organizations' && method === 'POST') {
+      if (!auth?.startsWith('Bearer at_')) return json(401, {});
+      if (body?.name === 'Over the limit') {
+        return json(403, {
+          error: { code: 'organization_limit_reached', message: 'You can create up to 1 organization.' },
+        });
+      }
+      return json(201, {
+        organization: {
+          id: 'org_new', name: body.name, slug: null, imageUrl: null,
+          role: 'org:owner', permissions: ['org:manage', 'org:delete'],
+        },
+      });
+    }
+
+    if (path === '/v1/me/organization/leave' || (path === '/v1/me/organization' && method === 'DELETE')) {
+      if (!auth?.startsWith('Bearer at_')) return json(401, {});
+      return json(200, { ok: true });
+    }
+
+    if (path === '/v1/me/sessions') {
+      if (!auth?.startsWith('Bearer at_')) return json(401, {});
+      return json(200, {
+        sessions: [
+          { id: 'sess_here', userAgent: 'UA', ipAddress: null, provider: 'email_password',
+            createdAt: '2026-01-01T00:00:00.000Z', lastActiveAt: '2026-01-01T00:00:00.000Z',
+            expiresAt: '2026-02-01T00:00:00.000Z', isCurrent: true },
+          { id: 'sess_phone', userAgent: 'UA2', ipAddress: null, provider: 'magic_link',
+            createdAt: '2026-01-01T00:00:00.000Z', lastActiveAt: '2026-01-01T00:00:00.000Z',
+            expiresAt: '2026-02-01T00:00:00.000Z', isCurrent: false },
+        ],
+      });
+    }
+
+    if (path === '/v1/me/sessions/sess_here' && method === 'DELETE') {
+      return json(400, { error: { code: 'session_is_current', message: 'Sign out instead.' } });
+    }
+    if (path.startsWith('/v1/me/sessions/') && method === 'DELETE') {
+      return json(200, { revoked: true });
+    }
+    if (path === '/v1/me/sessions/revoke-others') {
+      return json(200, { revoked: 1 });
+    }
+
     if (path === '/v1/me/organizations') {
       if (!auth?.startsWith('Bearer at_')) return json(401, {});
       return json(200, {
@@ -236,6 +282,23 @@ async function main() {
     'a secret key is refused before it can ship in a bundle',
     secretKeyRejected,
   );
+
+  console.log('\n\x1b[1mLoading once\x1b[0m');
+
+  {
+    /*
+     * Two callers at once (strict mode, a plugin plus a component) used
+     * to start two loads: two environment fetches, and a second attempt
+     * at a one-time handoff code the first had already spent.
+     */
+    const api = fakeApi();
+    const { client } = makeClient(api);
+    await Promise.all([client.load(), client.load(), client.load()]);
+    const fetches = api.calls.filter((c) => c.path === '/v1/environment').length;
+    check('concurrent loads share one run', fetches === 1, `${fetches} environment fetches`);
+    await client.load();
+    check('and a load after it finished does nothing', api.calls.filter((c) => c.path === '/v1/environment').length === 1);
+  }
 
   console.log('\n\x1b[1mSign in and session\x1b[0m');
 
@@ -424,6 +487,66 @@ async function main() {
       'signed out, the org list is empty rather than an error',
       (await client.organizations.list()).length === 0,
     );
+  }
+
+  console.log('\n\x1b[1mCreating, leaving and deleting organizations\x1b[0m');
+  {
+    const api = fakeApi();
+    const { client } = makeClient(api);
+    await client.load();
+    await client.signIn.withPassword({ identifier: 'a@example.com', password: 'x' });
+
+    const created = await client.organizations.create({ name: 'Northwind' });
+    check('creating returns the new membership with the caller as owner', created.id === 'org_new' && created.role === 'org:owner');
+    const switchAfterCreate = api.calls.findLast((c) => c.path === '/v1/auth/switch-organization');
+    check('and switches the session to it, so the next invite lands there', switchAfterCreate?.body?.organizationId === 'org_new');
+    check('which every subscriber sees', client.organization?.id === 'org_new');
+
+    let code = '';
+    try {
+      await client.organizations.create({ name: 'Over the limit' });
+    } catch (err) {
+      code = (err as ZevAuthError).code;
+    }
+    check('a refusal surfaces its reason code', code === 'organization_limit_reached', code);
+
+    await client.organizations.leave();
+    check('leaving calls the leave route', api.calls.some((c) => c.path === '/v1/me/organization/leave' && c.method === 'POST'));
+    check('and returns to personal scope at once', client.organization === null && api.calls.findLast((c) => c.path === '/v1/auth/switch-organization')?.body?.organizationId === null);
+
+    await client.organizations.setActive('org_1');
+    await client.organizations.delete();
+    check('deleting calls DELETE on the active organization', api.calls.some((c) => c.path === '/v1/me/organization' && c.method === 'DELETE'));
+    check('and also returns to personal scope', client.organization === null);
+  }
+
+  console.log('\n\x1b[1mYour sessions\x1b[0m');
+  {
+    const api = fakeApi();
+    const { client } = makeClient(api);
+    await client.load();
+    await client.signIn.withPassword({ identifier: 'a@example.com', password: 'x' });
+
+    const sessions = await client.me.sessions();
+    check('lists where they are signed in, current marked', sessions.length === 2 && sessions[0].isCurrent);
+    check('with no token material in the shape', !sessions.some((s) => 'accessToken' in s || 'refreshToken' in s));
+
+    await client.me.revokeSession('sess_phone');
+    check('revoking another session sends DELETE for that id', api.calls.some((c) => c.method === 'DELETE' && c.path === '/v1/me/sessions/sess_phone'));
+
+    let code = '';
+    try {
+      await client.me.revokeSession('sess_here');
+    } catch (err) {
+      code = (err as ZevAuthError).code;
+    }
+    check('the current one is refused with a reason', code === 'session_is_current', code);
+
+    const others = await client.me.revokeOtherSessions();
+    check('signing out elsewhere reports how many ended', others.revoked === 1);
+
+    await client.signOut();
+    check('signed out, the list is empty rather than an error', (await client.me.sessions()).length === 0);
   }
 
   console.log('\n\x1b[1mA fresh page load remembers who was signed in\x1b[0m');

@@ -46,6 +46,11 @@ export type {
  */
 export { themes, type ThemeName } from './internal/themes.js';
 /*
+ * The English strings, as the template a translator starts from, and
+ * the type that checks their translation.
+ */
+export { en as defaultLocalization, type Localization } from './internal/localization.js';
+/*
  * Exported so a developer building their own settings screen gets the
  * same picture control our components use, rather than reimplementing
  * the hash-upload-save dance around `uploadAvatar`.
@@ -81,6 +86,15 @@ export {
   OrganizationSwitcher,
   type OrganizationSwitcherProps,
 } from './components/OrganizationSwitcher.js';
+export {
+  CreateOrganization,
+  type CreateOrganizationProps,
+} from './components/CreateOrganization.js';
+export {
+  OrganizationList,
+  type OrganizationListProps,
+} from './components/OrganizationList.js';
+export { UserAvatar, type UserAvatarProps } from './components/UserAvatar.js';
 
 export {
   EmailUnverified,
@@ -105,6 +119,7 @@ export type {
   SignInMethod,
   ZevAuthState,
   ZevAuthUser,
+  UserSession,
 } from '@zevauth/js';
 export { ZevAuthError } from '@zevauth/js';
 export { useZevTheme } from './components/Brandable.js';

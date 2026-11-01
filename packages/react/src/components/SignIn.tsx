@@ -2,6 +2,7 @@ import { useState, type FormEvent, type ReactNode } from 'react';
 import { ZevAuthError } from '@zevauth/js';
 import { useComponentAppearance } from '../internal/context.js';
 import type { Appearance } from '../internal/appearance.js';
+import { errorMessage, format, type Localization } from '../internal/localization.js';
 import { Brandable } from './Brandable.js';
 import {
   Alert,
@@ -56,6 +57,8 @@ export interface SignInProps {
    * every screen should match; use this when one should not.
    */
   appearance?: Appearance;
+  /** The words on this component, merged over the provider's `localization`. */
+  localization?: Localization;
   /** Rendered instead of the form once somebody is signed in. */
   children?: React.ReactNode;
   className?: string;
@@ -97,6 +100,7 @@ export function SignIn({
   layout,
   aside,
   appearance,
+  localization,
   children,
   className,
 }: SignInProps) {
@@ -106,7 +110,11 @@ export function SignIn({
     branding,
     appearance: appearanceLayers,
     el,
-  } = useComponentAppearance('<SignIn>', appearance);
+    strings,
+    isLocalized,
+  } = useComponentAppearance('<SignIn>', appearance, localization);
+  const t = strings.signIn;
+  const c = strings.common;
 
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
@@ -188,8 +196,8 @@ export function SignIn({
        */
       setError(
         err instanceof ZevAuthError
-          ? err.message
-          : 'Something went wrong. Please try again.',
+          ? errorMessage(strings, err, c.genericError)
+          : c.genericError,
       );
     } finally {
       setIsBusy(false);
@@ -220,7 +228,7 @@ export function SignIn({
   };
 
   return (
-    <Brandable branding={branding} appearance={appearanceLayers} el={el} className={className}>
+    <Brandable branding={branding} appearance={appearanceLayers} el={el} strings={strings} className={className}>
       <Shell
         layout={resolvedLayout}
         align={branding?.contentAlign ?? 'center'}
@@ -233,9 +241,9 @@ export function SignIn({
         {stage.name === 'reset-request' ? (
           <>
             <Heading
-              title="Reset your password"
-              subtitle="We will email you a link to set a new one."
-              fallbackTitle="Reset your password"
+              title={t.resetTitle}
+              subtitle={t.resetSubtitle}
+              fallbackTitle={t.resetTitle}
             />
             {error ? <Alert>{error}</Alert> : null}
             <form
@@ -250,7 +258,7 @@ export function SignIn({
             >
               <div {...el('field')}>
                 <label {...el('label')} htmlFor="zv-reset-email">
-                  Email
+                  {c.email}
                 </label>
                 <input
                   id="zv-reset-email"
@@ -270,7 +278,7 @@ export function SignIn({
                 data-variant="primary"
                 disabled={isBusy}
               >
-                {isBusy ? <Spinner /> : 'Send reset link'}
+                {isBusy ? <Spinner /> : t.resetSubmit}
               </button>
             </form>
             <button
@@ -282,14 +290,14 @@ export function SignIn({
                 setStage({ name: 'credentials' });
               }}
             >
-              Back to sign in
+              {t.backToSignIn}
             </button>
           </>
         ) : stage.name === 'link-sent' ? (
           <>
-            <h1 {...el('title')}>Check your email</h1>
+            <h1 {...el('title')}>{t.linkSentTitle}</h1>
             <p {...el('subtitle')}>
-              If {stage.email} has an account, a sign-in link is on its way.
+              {format(t.linkSentBody, { email: stage.email })}
             </p>
             <button
               type="button"
@@ -297,20 +305,20 @@ export function SignIn({
               data-variant="ghost"
               onClick={() => setStage({ name: 'credentials' })}
             >
-              Use something else
+              {t.useSomethingElse}
             </button>
           </>
         ) : stage.name === 'code-sent' ? (
           <>
-            <h1 {...el('title')}>Enter your code</h1>
+            <h1 {...el('title')}>{t.codeSentTitle}</h1>
             <p {...el('subtitle')}>
-              If {stage.email} has an account, we sent it a code.
+              {format(t.codeSentBody, { email: stage.email })}
             </p>
             {error ? <Alert>{error}</Alert> : null}
             <form {...el('fields')} onSubmit={onVerifyCode}>
               <div {...el('field')}>
                 <label {...el('label')} htmlFor="zv-code">
-                  Code
+                  {t.codeLabel}
                 </label>
                 <input
                   id="zv-code"
@@ -332,7 +340,7 @@ export function SignIn({
                 disabled={isBusy || code.length === 0}
               >
                 {isBusy ? <Spinner /> : null}
-                Continue
+                {c.continue}
               </button>
             </form>
             <button
@@ -341,15 +349,15 @@ export function SignIn({
               data-variant="ghost"
               onClick={() => setStage({ name: 'credentials' })}
             >
-              Use something else
+              {t.useSomethingElse}
             </button>
           </>
         ) : (
           <>
             <Heading
-              title={branding?.signInTitle}
+              title={isLocalized('signIn', 'title') ? t.title : branding?.signInTitle}
               subtitle={branding?.signInSubtitle}
-              fallbackTitle="Sign in"
+              fallbackTitle={t.title}
             />
             {error ? <Alert>{error}</Alert> : null}
 
@@ -370,10 +378,10 @@ export function SignIn({
                     one control on the page that leaves the site.
                   */}
                   <ZevMark size={13} />
-                  Continue with ZevID
+                  {c.continueWithZevId}
                 </button>
                 {hasPassword || hasMagicLink || hasEmailCode ? (
-                  <Divider label="or" />
+                  <Divider label={c.or} />
                 ) : null}
               </>
             ) : null}
@@ -382,7 +390,7 @@ export function SignIn({
               <form {...el('fields')} onSubmit={onSubmitPassword}>
                 <div {...el('field')}>
                   <label {...el('label')} htmlFor="zv-identifier">
-                    Email
+                    {c.email}
                   </label>
                   <input
                     id="zv-identifier"
@@ -401,7 +409,7 @@ export function SignIn({
                 </div>
                 <div {...el('field')}>
                   <label {...el('label')} htmlFor="zv-password">
-                    Password
+                    {c.password}
                   </label>
                   <input
                     id="zv-password"
@@ -420,7 +428,7 @@ export function SignIn({
                   disabled={isBusy || !identifier || !password}
                 >
                   {isBusy ? <Spinner /> : null}
-                  Sign in
+                  {t.submit}
                 </button>
               </form>
             ) : null}
@@ -443,7 +451,7 @@ export function SignIn({
                   aria-expanded={showMore}
                   onClick={() => setShowMore((open) => !open)}
                 >
-                  More options
+                  {t.moreOptions}
                   <svg
                     className="zv-chevron"
                     width="11"
@@ -458,7 +466,7 @@ export function SignIn({
                   </svg>
                 </button>
               ) : (
-                <Divider label="or" />
+                <Divider label={c.or} />
               )
             ) : null}
 
@@ -466,7 +474,7 @@ export function SignIn({
               <div {...el('fields')}>
                 <div {...el('field')}>
                   <label {...el('label')} htmlFor="zv-email">
-                    Email
+                    {c.email}
                   </label>
                   <input
                     id="zv-email"
@@ -501,7 +509,7 @@ export function SignIn({
                       onClick={() => client.signIn.withZevId()}
                     >
                       <ZevMark size={13} />
-                      Continue with ZevID
+                      {c.continueWithZevId}
                     </button>
                   ) : null}
                   {hasMagicLink ? (
@@ -512,7 +520,7 @@ export function SignIn({
                       disabled={isBusy || !identifier}
                       onClick={onSendLink}
                     >
-                      Email me a sign-in link
+                      {t.emailLink}
                     </button>
                   ) : null}
 
@@ -524,7 +532,7 @@ export function SignIn({
                       disabled={isBusy || !identifier}
                       onClick={onSendCode}
                     >
-                      Email me a code
+                      {t.emailCode}
                     </button>
                   ) : null}
                 </div>
@@ -558,7 +566,7 @@ export function SignIn({
                      */
                     if (resetMode === 'inline') {
                       if (!identifier.trim()) {
-                        setError('Enter your email address first, then choose this again.');
+                        setError(t.emailFirst);
                         return;
                       }
                       void run(async () => {
@@ -572,7 +580,7 @@ export function SignIn({
                     setStage({ name: 'reset-request' });
                   }}
                 >
-                  Forgot your password?
+                  {t.forgotPassword}
                 </button>
               </div>
             ) : null}
@@ -585,8 +593,7 @@ export function SignIn({
                * looking at this in their own app.
                */
               <div {...el('notice')}>
-                No sign-in methods are enabled for this environment. Turn one on
-                under Authentication in the ZevAuth console.
+                {t.noMethods}
               </div>
             ) : null}
           </>

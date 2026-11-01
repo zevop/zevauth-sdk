@@ -14,6 +14,7 @@
  * two users, silently, in a nightly job nobody is watching.
  */
 import { ZevAuthBackend, ZevAuthError } from '../src/index';
+import { bearerFrom, getAuth, requireAuth } from '../src/verify';
 
 let passed = 0;
 let failed = 0;
@@ -316,6 +317,17 @@ async function main() {
       threw = true;
     }
     check('an empty response resolves rather than throwing', !threw);
+  }
+
+  console.log('\n\x1b[1mVerifying tokens on any server\x1b[0m');
+  {
+    check('a bearer token is read from the header', bearerFrom('Bearer abc.def.ghi') === 'abc.def.ghi');
+    check('an API key in the header is not mistaken for a token', bearerFrom('Bearer sk_test_123') === null && bearerFrom('Bearer pk_live_1') === null);
+    const anonymous = await getAuth(new Request('https://app.test/api'), { environmentId: 'env_test_x' });
+    check('no token reads as signed out, not an error', anonymous.isSignedIn === false && anonymous.userId === null && anonymous.has({ permission: 'x' }) === false);
+    let refused: unknown = null;
+    try { await requireAuth(new Request('https://app.test/api'), { environmentId: 'env_test_x' }); } catch (err) { refused = err; }
+    check('requireAuth throws a 401 Response a framework can return as is', refused instanceof Response && refused.status === 401);
   }
 
   console.log(

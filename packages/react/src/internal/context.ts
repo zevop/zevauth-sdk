@@ -7,6 +7,7 @@ import {
   type ElementResolver,
   type MergedAppearance,
 } from './appearance.js';
+import { mergeLocalization, type Localization, type Strings } from './localization.js';
 
 export interface ZevAuthContextValue {
   client: ZevAuth;
@@ -21,6 +22,8 @@ export interface ZevAuthContextValue {
   branding: Branding | null;
   /** The provider's `appearance`, as given, for components to merge over. */
   appearance?: Appearance;
+  /** The provider's `localization`, as given. */
+  localization?: Localization;
 }
 
 /**
@@ -93,6 +96,14 @@ export interface ComponentAppearance {
   appearance: MergedAppearance;
   /** `className` and `style` for one part; see `createElementResolver`. */
   el: ElementResolver;
+  /** Every word the component prints, English unless overridden. */
+  strings: Strings;
+  /**
+   * Whether code set this string, as opposed to it being the English
+   * default. Headings need it: the console's heading wins over our
+   * default wording, but code wins over the console.
+   */
+  isLocalized: (group: keyof Strings, key: string) => boolean;
 }
 
 /**
@@ -107,8 +118,14 @@ export interface ComponentAppearance {
 export function useComponentAppearance(
   hookName: string,
   local: Appearance | undefined,
+  localLocalization?: Localization,
 ): ComponentAppearance {
-  const { client, state, appearance: provided } = useZevAuthContext(hookName);
+  const {
+    client,
+    state,
+    appearance: provided,
+    localization: providedLocalization,
+  } = useZevAuthContext(hookName);
 
   /*
    * `state` is a dependency because `client.branding` arrives with the
@@ -122,6 +139,11 @@ export function useComponentAppearance(
       branding: mergeAppearance(client.branding, appearance.branding),
       appearance,
       el: createElementResolver(appearance.elements),
+      strings: mergeLocalization(providedLocalization, localLocalization),
+      isLocalized: (group: keyof Strings, key: string) =>
+        [providedLocalization, localLocalization].some(
+          (layer) => (layer?.[group] as Record<string, unknown> | undefined)?.[key] !== undefined,
+        ),
     };
-  }, [client, state, provided, local]);
+  }, [client, state, provided, local, providedLocalization, localLocalization]);
 }

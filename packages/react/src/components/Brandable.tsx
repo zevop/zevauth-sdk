@@ -16,6 +16,8 @@ import {
   type MergedAppearance,
 } from '../internal/appearance.js';
 
+import { StringsContext, en, type Strings } from '../internal/localization.js';
+
 const noElements = createElementResolver({});
 
 const RADIUS: Record<string, string> = {
@@ -79,12 +81,14 @@ export function Brandable({
   branding,
   appearance,
   el = noElements,
+  strings = en,
   className,
   children,
 }: {
   branding: Branding | null;
   appearance?: MergedAppearance;
   el?: ElementResolver;
+  strings?: Strings;
   className?: string;
   children: ReactNode;
 }) {
@@ -132,13 +136,15 @@ export function Brandable({
   return (
     <ZevThemeContext.Provider value={isDark}>
       <ElementsContext.Provider value={el}>
-        <div
-          className={className ? `${root.className} ${className}` : root.className}
-          data-theme={isDark ? 'dark' : 'light'}
-          style={root.style}
-        >
-          {children}
-        </div>
+        <StringsContext.Provider value={strings}>
+          <div
+            className={className ? `${root.className} ${className}` : root.className}
+            data-theme={isDark ? 'dark' : 'light'}
+            style={root.style}
+          >
+            {children}
+          </div>
+        </StringsContext.Provider>
       </ElementsContext.Provider>
     </ZevThemeContext.Provider>
   );

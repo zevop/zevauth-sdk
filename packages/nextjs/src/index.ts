@@ -33,6 +33,9 @@ export {
   UserProfile,
   OrganizationProfile,
   OrganizationSwitcher,
+  CreateOrganization,
+  OrganizationList,
+  UserAvatar,
   SignedIn,
   SignedOut,
   ZevAuthLoading,
@@ -48,6 +51,7 @@ export {
   ImageField,
   useZevTheme,
   themes,
+  defaultLocalization,
   ZevAuthError,
 } from '@zevauth/react';
 
@@ -64,6 +68,9 @@ export type {
   UserProfileProps,
   OrganizationProfileProps,
   OrganizationSwitcherProps,
+  CreateOrganizationProps,
+  OrganizationListProps,
+  UserAvatarProps,
   ProtectProps,
   ImageFieldProps,
   Appearance,
@@ -73,6 +80,7 @@ export type {
   AppearanceVariables,
   ThemedColor,
   ThemeName,
+  Localization,
   UseAuth,
   UseUser,
   UseOrganization,
@@ -84,5 +92,6 @@ export type {
   SignInMethod,
   ZevAuthState,
   ZevAuthUser,
+  UserSession,
   ZevAuth,
 } from '@zevauth/react';

@@ -1,18 +1,38 @@
 import { useCallback, useRef, useState } from 'react';
 import { useComponentAppearance } from '../internal/context.js';
 import { useElements, type Appearance } from '../internal/appearance.js';
+import { format, type Localization } from '../internal/localization.js';
 import { useDismiss } from '../internal/useDismiss.js';
 import { Brandable } from './Brandable.js';
+import { Dialog } from './Dialog.js';
+import { UserProfile, type UserProfileProps } from './UserProfile.js';
 
 export interface UserButtonProps {
   /** Where to send somebody after signing out. */
   afterSignOutUrl?: string;
+  /**
+   * Add "Manage account" to the menu.
+   *
+   * `'none'` (default) leaves the menu as it is. `'modal'` opens
+   * `<UserProfile>` in a dialog over the page. `'navigation'` goes to
+   * `userProfileUrl`, for an app with its own settings page.
+   */
+  userProfileMode?: 'none' | 'modal' | 'navigation';
+  /** Where "Manage account" goes with `userProfileMode="navigation"`. */
+  userProfileUrl?: string;
+  /**
+   * Passed to the `<UserProfile>` in the dialog. It opens in the sidebar
+   * layout unless you say otherwise.
+   */
+  userProfileProps?: Omit<UserProfileProps, 'appearance' | 'localization' | 'className'>;
   /**
    * How this one component looks, merged over the provider's
    * `appearance`. See `Appearance` for the console fields, `variables`
    * and `elements`.
    */
   appearance?: Appearance;
+  /** The words on this component, merged over the provider's `localization`. */
+  localization?: Localization;
   className?: string;
 }
 
@@ -24,16 +44,28 @@ export interface UserButtonProps {
  * and two controls competing for the same slot is worse than one
  * appearing when it applies.
  */
-export function UserButton({ afterSignOutUrl, appearance, className }: UserButtonProps) {
+export function UserButton({
+  afterSignOutUrl,
+  userProfileMode = 'none',
+  userProfileUrl,
+  userProfileProps,
+  appearance,
+  localization,
+  className,
+}: UserButtonProps) {
   const {
     client,
     state,
     branding,
     appearance: appearanceLayers,
     el,
-  } = useComponentAppearance('<UserButton>', appearance);
+    strings,
+  } = useComponentAppearance('<UserButton>', appearance, localization);
+  const t = strings.userButton;
   const [isOpen, setIsOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   const close = useCallback(() => setIsOpen(false), []);
   useDismiss(wrapRef, isOpen, close);
@@ -48,17 +80,18 @@ export function UserButton({ afterSignOutUrl, appearance, className }: UserButto
     'Account';
 
   return (
-    <Brandable branding={branding} appearance={appearanceLayers} el={el} className={className}>
+    <Brandable branding={branding} appearance={appearanceLayers} el={el} strings={strings} className={className}>
       <div className="zv-menu-wrap" ref={wrapRef}>
         <button
           type="button"
+          ref={triggerRef}
           {...el('menuTrigger')}
           onClick={() => setIsOpen((open) => !open)}
           /* Both, so a screen reader announces a menu that opens and
              says whether it is open, rather than an unlabelled button. */
           aria-haspopup="menu"
           aria-expanded={isOpen}
-          aria-label={`Account menu for ${displayName}`}
+          aria-label={format(t.menuLabel, { name: displayName })}
         >
           <Avatar imageUrl={user.imageUrl} name={displayName} />
         </button>
@@ -77,7 +110,7 @@ export function UserButton({ afterSignOutUrl, appearance, className }: UserButto
 
             {state.organization ? (
               <>
-                <div {...el('menuLabel')}>Organization</div>
+                <div {...el('menuLabel')}>{t.organization}</div>
                 <button
                   type="button"
                   {...el('menuItem')}
@@ -90,6 +123,23 @@ export function UserButton({ afterSignOutUrl, appearance, className }: UserButto
                   <span className="zv-truncate">{state.organization.name}</span>
                 </button>
               </>
+            ) : null}
+
+            {userProfileMode !== 'none' ? (
+              <button
+                type="button"
+                {...el('menuItem')}
+                role="menuitem"
+                onClick={() => {
+                  close();
+                  if (userProfileMode === 'modal') setIsProfileOpen(true);
+                  else if (userProfileUrl && typeof window !== 'undefined') {
+                    window.location.assign(userProfileUrl);
+                  }
+                }}
+              >
+                {t.manageAccount}
+              </button>
             ) : null}
 
             <button
@@ -105,11 +155,31 @@ export function UserButton({ afterSignOutUrl, appearance, className }: UserButto
                 });
               }}
             >
-              Sign out
+              {t.signOut}
             </button>
           </div>
         ) : null}
       </div>
+
+      {isProfileOpen ? (
+        <Dialog
+          label={t.manageAccount}
+          closeLabel={t.closeDialog}
+          onClose={() => setIsProfileOpen(false)}
+          returnFocusRef={triggerRef}
+          branding={branding}
+          appearance={appearanceLayers}
+          el={el}
+          strings={strings}
+        >
+          <UserProfile
+            variant="sidebar"
+            {...userProfileProps}
+            appearance={appearance}
+            localization={localization}
+          />
+        </Dialog>
+      ) : null}
     </Brandable>
   );
 }

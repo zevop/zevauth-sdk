@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import type { Branding } from '@zevauth/js';
 import { useZevTheme } from './Brandable.js';
 import { useElements } from '../internal/appearance.js';
+import { useStrings } from '../internal/localization.js';
 
 /** The ZEV mark. The same paths every Zev product uses. */
 export function ZevMark({ size = 11 }: { size?: number }) {
@@ -67,10 +68,11 @@ export function Identity({ branding }: { branding: Branding | null }) {
 
 export function TestModeBadge() {
   const el = useElements();
+  const strings = useStrings();
   return (
     <div {...el('testModeBadge')}>
       <span className="zv-dot" />
-      Test mode
+      {strings.common.testMode}
     </div>
   );
 }
@@ -86,6 +88,7 @@ export function TestModeBadge() {
  */
 export function PoweredBy({ environmentId }: { environmentId?: string | null }) {
   const el = useElements();
+  const strings = useStrings();
   const url = new URL('https://www.zevauth.com');
   url.searchParams.set('utm_source', 'zevauth-sdk');
   url.searchParams.set('utm_medium', 'attribution');
@@ -102,7 +105,7 @@ export function PoweredBy({ environmentId }: { environmentId?: string | null }) 
     >
       <ZevMark />
       <span>
-        Secured by <strong style={{ fontWeight: 600 }}>ZevAuth</strong>
+        {strings.common.securedBy} <strong style={{ fontWeight: 600 }}>ZevAuth</strong>
       </span>
     </a>
   );

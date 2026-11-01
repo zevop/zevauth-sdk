@@ -106,6 +106,13 @@ const AUTHORED = `
 .zv-root.zv-root .zv-menu-sub,
 .zv-root.zv-root .zv-menu-label { color: var(--zv-muted); }
 .zv-root.zv-root .zv-menu-item { color: var(--zv-text); }
+/* Initials sit on the accent. A host rule colouring spans (our docs'
+   own \`.prose\` reset did) painted them in the text colour, invisible
+   on a dark accent. */
+.zv-root.zv-root .zv-avatar { color: var(--zv-on-accent); }
+/* Typography resets commonly give \`hr\` a large margin; ours is a hairline
+   between sections and keeps its own. */
+.zv-root.zv-root .zv-section-divider { margin: 2px 0; }
 .zv-root.zv-root .zv-input { color: var(--zv-field-text); }
 .zv-root.zv-root .zv-image-preview { color: var(--zv-muted); }
 .zv-root.zv-root .zv-button[data-variant='primary'] { color: var(--zv-on-accent); }
@@ -545,7 +552,6 @@ const AUTHORED = `
   display: flex; align-items: center; justify-content: space-between;
   gap: 10px; padding: 7px 0;
 }
-.zv-member + .zv-member { border-top: 1px solid var(--zv-border); }
 .zv-member-name { font-size: calc(var(--zv-font-size) * 0.963); min-width: 0; }
 .zv-member .zv-button { width: auto; }
 
@@ -604,6 +610,169 @@ const AUTHORED = `
 .zv-menu-label {
   padding: 6px 8px 3px; font-size: calc(var(--zv-font-size) * 0.778); text-transform: uppercase;
   letter-spacing: .06em; color: var(--zv-muted);
+}
+
+/* ── Added in 0.2.7 ──────────────────────────────────────────────
+ * Everything below targets classes and attributes that only the new
+ * components and opt-in props render, so no existing screen can pick
+ * any of it up.
+ */
+.zv-root.zv-root .zv-section-title { color: var(--zv-text); font-size: var(--zv-font-size); font-weight: 600; }
+.zv-root.zv-root .zv-nav-item { color: var(--zv-muted); }
+.zv-root.zv-root .zv-nav-item[aria-current='page'] { color: var(--zv-text); }
+.zv-root.zv-root .zv-badge { color: var(--zv-muted); }
+.zv-root.zv-root .zv-list-item { color: var(--zv-text); }
+.zv-root.zv-root .zv-list-item[data-kind='create'] { color: var(--zv-muted); }
+.zv-root.zv-root .zv-button[data-variant='danger'] { color: var(--zv-error); }
+.zv-root.zv-root :is(.zv-nav-item, .zv-list-item):focus-visible { outline: none; }
+
+.zv-button[data-variant='danger'] {
+  background: transparent;
+  border-color: color-mix(in srgb, var(--zv-error) 40%, var(--zv-border));
+}
+.zv-button[data-variant='danger']:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--zv-error) 8%, transparent);
+}
+
+/* A labelled block inside a profile: a heading, then its rows. */
+.zv-section { display: flex; flex-direction: column; gap: 12px; }
+.zv-section-title { margin: 0; }
+.zv-section-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; flex-wrap: wrap;
+}
+
+.zv-badge {
+  display: inline-flex; align-items: center;
+  padding: 1px 7px;
+  font-size: calc(var(--zv-font-size) * 0.815); font-weight: 500;
+  border: 1px solid var(--zv-border);
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+/* ── Sidebar layout (opt-in: variant="sidebar") ─────────────────── */
+/*
+ * The card loses its own padding and the two panes carry it, so the
+ * navigation can be tinted edge to edge. Width is a token like the
+ * other cards, and the layout stacks on narrow screens rather than
+ * squeezing the form beside a column of links.
+ */
+.zv-card[data-layout='sidebar'] {
+  /*
+   * Fluid up to its width, unlike the narrow cards. At 760px a fixed
+   * width overflows most of the places a settings screen sits (a
+   * dialog, a content column beside an app's own navigation), and the
+   * grid's minimum content is small enough that the card can shrink
+   * without collapsing.
+   */
+  width: 100%;
+  max-width: var(--zv-card-width, 760px);
+  padding: 0;
+  gap: 0;
+  display: grid;
+  grid-template-columns: 210px minmax(0, 1fr);
+  overflow: hidden;
+}
+.zv-nav {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 22px 12px;
+  background: color-mix(in srgb, var(--zv-border) 22%, var(--zv-surface));
+  border-right: 1px solid var(--zv-border);
+}
+.zv-nav-heading { padding: 0 10px 14px; display: flex; flex-direction: column; gap: 2px; }
+.zv-nav-item {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  padding: 7px 10px; font: inherit; font-size: calc(var(--zv-font-size) * 0.963);
+  text-align: left; background: transparent; border: 0;
+  border-radius: var(--zv-radius); cursor: pointer;
+}
+.zv-nav-item:hover { background: color-mix(in srgb, var(--zv-border) 45%, transparent); }
+.zv-nav-item[aria-current='page'] {
+  font-weight: 500;
+  background: color-mix(in srgb, var(--zv-border) 60%, transparent);
+}
+.zv-nav-item:focus-visible { box-shadow: 0 0 0 2px color-mix(in srgb, var(--zv-accent) 35%, transparent); }
+.zv-panel {
+  display: flex; flex-direction: column; gap: 18px;
+  padding: var(--zv-card-py) var(--zv-card-px);
+  min-width: 0;
+}
+@media (max-width: 720px) {
+  .zv-card[data-layout='sidebar'] { grid-template-columns: 1fr; }
+  .zv-nav {
+    flex-direction: row; flex-wrap: wrap; padding: 10px;
+    border-right: 0; border-bottom: 1px solid var(--zv-border);
+  }
+  .zv-nav-heading { display: none; }
+  .zv-nav-item { width: auto; }
+}
+
+/* ── Active devices ─────────────────────────────────────────────── */
+.zv-session-list { display: flex; flex-direction: column; }
+.zv-session {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; padding: 10px 0;
+}
+.zv-session + .zv-session { border-top: 1px solid var(--zv-border); }
+.zv-session .zv-button { width: auto; }
+.zv-session-name { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+/* ── Chooser list (OrganizationList) ────────────────────────────── */
+/*
+ * Rows run to the card's edges, separated by hairlines, the way an
+ * account chooser reads: one decision per row, nothing else competing.
+ */
+.zv-list {
+  display: flex; flex-direction: column;
+  margin: 0 calc(var(--zv-card-px) * -1);
+  border-top: 1px solid var(--zv-border);
+}
+.zv-list-item {
+  display: flex; align-items: center; gap: 12px; width: 100%;
+  padding: 12px var(--zv-card-px);
+  font: inherit; font-size: calc(var(--zv-font-size) * 0.963); font-weight: 500;
+  text-align: left; background: transparent; border: 0;
+  border-bottom: 1px solid var(--zv-border);
+  cursor: pointer;
+}
+.zv-list-item:hover:not(:disabled) { background: color-mix(in srgb, var(--zv-border) 30%, transparent); }
+.zv-list-item:focus-visible { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--zv-accent) 35%, transparent); }
+.zv-list-item:disabled { cursor: default; opacity: .6; }
+.zv-list-item[data-kind='create'] { font-weight: 400; color: var(--zv-muted); }
+/* The plus in a dashed ring: present, but quieter than a real account. */
+.zv-list-plus {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; flex: 0 0 28px;
+  border: 1px dashed var(--zv-border); border-radius: 999px;
+}
+.zv-avatar[data-shape='square'] { border-radius: var(--zv-radius); }
+
+/* ── Dialog (opt-in: UserButton userProfileMode="modal") ────────── */
+.zv-modal-backdrop {
+  position: fixed; inset: 0; z-index: 1000;
+  display: flex; align-items: flex-start; justify-content: center;
+  padding: 6vh 16px 16px;
+  overflow-y: auto;
+  background: rgba(0, 0, 0, .4);
+}
+.zv-modal {
+  position: relative;
+  max-width: 100%;
+  border-radius: calc(var(--zv-radius) * 1.5);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, .2);
+}
+.zv-modal:focus { outline: none; }
+.zv-modal-close {
+  position: absolute; top: 10px; right: 10px; z-index: 1;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px;
+  color: var(--zv-muted); background: transparent; border: 0;
+  border-radius: var(--zv-radius); cursor: pointer;
+}
+.zv-modal-close:hover { color: var(--zv-text); background: color-mix(in srgb, var(--zv-border) 50%, transparent); }
+.zv-root.zv-root .zv-modal-close:focus-visible {
+  outline: none; box-shadow: 0 0 0 2px color-mix(in srgb, var(--zv-accent) 35%, transparent);
 }
 
 /* An animation that respects somebody who asked for less of it. */

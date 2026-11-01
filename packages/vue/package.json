@@ -1,0 +1,64 @@
+{
+  "name": "@zevauth/vue",
+  "version": "0.1.0",
+  "description": "ZevAuth for Vue 3 and Nuxt: composables, control components and drop-in authentication UI.",
+  "keywords": [
+    "zevauth",
+    "authentication",
+    "auth",
+    "vue",
+    "nuxt",
+    "composables",
+    "components"
+  ],
+  "license": "MIT",
+  "author": "ZevOp",
+  "homepage": "https://docs.zevauth.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zevop/zevauth-sdk.git",
+    "directory": "packages/vue"
+  },
+  "bugs": {
+    "url": "https://github.com/zevop/zevauth-sdk/issues"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b",
+    "verify": "tsx scripts/verify.ts"
+  },
+  "peerDependencies": {
+    "vue": ">=3.3"
+  },
+  "dependencies": {
+    "@zevauth/ui": "^0.1.0"
+  },
+  "devDependencies": {
+    "happy-dom": "^15.11.7",
+    "tsx": "^4.20.6",
+    "typescript": "~5.9.0",
+    "vue": "^3.5.0"
+  }
+}

@@ -105,7 +105,20 @@ export type AppearanceElementKey =
   | 'memberRow'
   | 'imageField'
   | 'imagePreview'
-  | 'progress';
+  | 'progress'
+  | 'buttonDanger'
+  | 'navigation'
+  | 'navigationItem'
+  | 'panel'
+  | 'sectionTitle'
+  | 'badge'
+  | 'sessionList'
+  | 'sessionRow'
+  | 'list'
+  | 'listItem'
+  | 'modal'
+  | 'modalBackdrop'
+  | 'userAvatar';
 
 /**
  * A class name (your stylesheet, Tailwind) or a style object.
@@ -205,6 +218,20 @@ export const ELEMENT_CLASS: Record<AppearanceElementKey, string | null> = {
   imageField: 'zv-image-field',
   imagePreview: 'zv-image-preview',
   progress: 'zv-progress',
+  buttonDanger: null,
+  navigation: 'zv-nav',
+  navigationItem: 'zv-nav-item',
+  panel: 'zv-panel',
+  sectionTitle: 'zv-section-title',
+  badge: 'zv-badge',
+  sessionList: 'zv-session-list',
+  sessionRow: 'zv-session',
+  list: 'zv-list',
+  listItem: 'zv-list-item',
+  modal: 'zv-modal',
+  modalBackdrop: 'zv-modal-backdrop',
+  // Adds to `avatar`, so it can be told apart from the menu's avatar.
+  userAvatar: null,
 };
 
 interface ResolvedElement {

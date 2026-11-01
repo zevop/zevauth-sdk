@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ZevAuthError } from '@zevauth/js';
 import { Alert } from './parts.js';
 import { useElements } from '../internal/appearance.js';
+import { errorMessage, format, useStrings } from '../internal/localization.js';
 
 export interface ImageFieldProps {
   label: string;
@@ -51,6 +52,8 @@ export function ImageField({
   isDisabled,
 }: ImageFieldProps) {
   const el = useElements();
+  const strings = useStrings();
+  const t = strings.imageField;
   const inputRef = useRef<HTMLInputElement>(null);
   const [progress, setProgress] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -70,11 +73,11 @@ export function ImageField({
      * sent over somebody's phone connection.
      */
     if (!ACCEPTED.includes(file.type)) {
-      setError('Use a PNG, JPG or WebP image.');
+      setError(t.wrongType);
       return;
     }
     if (file.size > MAX_BYTES) {
-      setError('That image is over 1 MB. Try a smaller one.');
+      setError(t.tooLarge);
       return;
     }
 
@@ -84,7 +87,7 @@ export function ImageField({
       await onSave(url);
     } catch (err) {
       setError(
-        err instanceof ZevAuthError ? err.message : 'Could not upload that image.',
+        err instanceof ZevAuthError ? errorMessage(strings, err, t.uploadFailed) : t.uploadFailed,
       );
     } finally {
       setProgress(null);
@@ -100,7 +103,7 @@ export function ImageField({
       await onSave(null);
     } catch (err) {
       setError(
-        err instanceof ZevAuthError ? err.message : 'Could not remove that image.',
+        err instanceof ZevAuthError ? errorMessage(strings, err, t.removeFailed) : t.removeFailed,
       );
     }
   }
@@ -135,12 +138,12 @@ export function ImageField({
               <div
                 {...el('progress')}
                 role="progressbar"
-                aria-label={`Uploading ${label.toLowerCase()}`}
+                aria-label={format(t.uploadingLabel, { label: label.toLowerCase() })}
                 aria-valuenow={Math.round((progress ?? 0) * 100)}
               >
                 <span style={{ width: `${Math.round((progress ?? 0) * 100)}%` }} />
               </div>
-              <span {...el('hint')}>Uploading</span>
+              <span {...el('hint')}>{t.uploading}</span>
             </>
           ) : (
             <>
@@ -152,7 +155,7 @@ export function ImageField({
                   disabled={isDisabled}
                   onClick={() => inputRef.current?.click()}
                 >
-                  {value ? 'Replace' : 'Upload'}
+                  {value ? t.replace : t.upload}
                 </button>
                 {value ? (
                   <button
@@ -162,11 +165,11 @@ export function ImageField({
                     disabled={isDisabled}
                     onClick={() => void remove()}
                   >
-                    Remove
+                    {t.remove}
                   </button>
                 ) : null}
               </div>
-              <span {...el('hint')}>PNG, JPG or WebP. Up to 1 MB.</span>
+              <span {...el('hint')}>{t.hint}</span>
             </>
           )}
         </div>

@@ -1,5 +1,6 @@
 import { useComponentAppearance } from '../internal/context.js';
 import type { Appearance } from '../internal/appearance.js';
+import type { Localization } from '../internal/localization.js';
 import { Brandable } from './Brandable.js';
 import { ZevMark } from './parts.js';
 
@@ -21,6 +22,8 @@ export interface SignInWithZevIdProps {
    * and `elements`.
    */
   appearance?: Appearance;
+  /** The words on this component, merged over the provider's `localization`. */
+  localization?: Localization;
   className?: string;
 }
 
@@ -42,10 +45,11 @@ export interface SignInWithZevIdProps {
  */
 export function SignInWithZevId({
   redirectUrl,
-  label = 'Continue with ZevID',
+  label,
   variant = 'secondary',
   shape = 'default',
   appearance,
+  localization,
   className,
 }: SignInWithZevIdProps) {
   const {
@@ -53,10 +57,11 @@ export function SignInWithZevId({
     branding,
     appearance: appearanceLayers,
     el,
-  } = useComponentAppearance('<SignInWithZevId>', appearance);
+    strings,
+  } = useComponentAppearance('<SignInWithZevId>', appearance, localization);
 
   return (
-    <Brandable branding={branding} appearance={appearanceLayers} el={el} className={className}>
+    <Brandable branding={branding} appearance={appearanceLayers} el={el} strings={strings} className={className}>
       <button
         type="button"
         {...el(['button', variant === 'primary' ? 'buttonPrimary' : 'buttonSecondary', 'zevIdButton'])}
@@ -65,7 +70,7 @@ export function SignInWithZevId({
         onClick={() => client.signIn.withZevId({ redirectUrl })}
       >
         <ZevMark size={13} />
-        {label}
+        {label ?? strings.common.continueWithZevId}
       </button>
     </Brandable>
   );

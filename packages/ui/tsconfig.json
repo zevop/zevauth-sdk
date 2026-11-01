@@ -1,0 +1,17 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "./dist/types",
+    "rootDir": "./src",
+    "jsx": "react-jsx",
+    "composite": true,
+    "emitDeclarationOnly": true
+  },
+  /*
+   * tsc only writes the declarations here. The JavaScript is bundled by
+   * esbuild (scripts/bundle.mjs), because this package ships React
+   * inside it and tsc cannot do that.
+   */
+  "references": [{ "path": "../js" }, { "path": "../react" }],
+  "include": ["src"]
+}

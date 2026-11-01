@@ -1,0 +1,67 @@
+{
+  "name": "@zevauth/ui",
+  "version": "0.1.0",
+  "description": "ZevAuth's drop-in components for any stack: Vue, Svelte, Angular, Astro or plain HTML.",
+  "keywords": [
+    "zevauth",
+    "authentication",
+    "auth",
+    "components",
+    "vanilla",
+    "web"
+  ],
+  "license": "MIT",
+  "author": "ZevOp",
+  "homepage": "https://docs.zevauth.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zevop/zevauth-sdk.git",
+    "directory": "packages/ui"
+  },
+  "bugs": {
+    "url": "https://github.com/zevop/zevauth-sdk/issues"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/types/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "unpkg": "./dist/zevauth-ui.global.js",
+  "jsdelivr": "./dist/zevauth-ui.global.js",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc -b && node scripts/bundle.mjs",
+    "typecheck": "tsc -b",
+    "verify": "tsx scripts/verify.ts"
+  },
+  "dependencies": {
+    "@zevauth/js": "^0.2.0",
+    "@zevauth/react": "^0.2.7"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "esbuild": "^0.28.0",
+    "happy-dom": "^15.11.7",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "tsx": "^4.20.6",
+    "typescript": "~5.9.0"
+  }
+}
