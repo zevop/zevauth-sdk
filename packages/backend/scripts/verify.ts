@@ -330,6 +330,63 @@ async function main() {
     check('requireAuth throws a 401 Response a framework can return as is', refused instanceof Response && refused.status === 401);
   }
 
+  console.log('\n\x1b[1mSession tasks and two-step verification\x1b[0m');
+  {
+    // A real RS256 key and discovery served from a stubbed fetch, so the
+    // tokens below are verified exactly as production ones are.
+    const { generateKeyPair, exportJWK, SignJWT } = await import('jose');
+    const { publicKey, privateKey } = await generateKeyPair('RS256');
+    const jwk = { ...(await exportJWK(publicKey)), kid: 'k1', alg: 'RS256', use: 'sig' };
+    const api = 'https://api.mfa.test';
+    const env = 'env_test_mfa';
+    const issuer = `${api}/v1/${env}`;
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      const url = String(input instanceof Request ? input.url : input);
+      if (url.endsWith('/.well-known/openid-configuration')) {
+        return new Response(JSON.stringify({ issuer, jwks_uri: `${issuer}/.well-known/jwks.json` }), { status: 200 });
+      }
+      if (url.endsWith('/jwks.json')) return new Response(JSON.stringify({ keys: [jwk] }), { status: 200 });
+      return new Response('{}', { status: 404 });
+    }) as typeof fetch;
+
+    const mint = (extra: Record<string, unknown>) =>
+      new SignJWT({ sid: 'sess_1', ...extra })
+        .setProtectedHeader({ alg: 'RS256', kid: 'k1' })
+        .setIssuer(issuer)
+        .setAudience(env)
+        .setSubject('user_1')
+        .setIssuedAt()
+        .setExpirationTime('5m')
+        .sign(privateKey);
+    const request = async (extra: Record<string, unknown>) =>
+      new Request('https://app.test/api', { headers: { authorization: `Bearer ${await mint(extra)}` } });
+    const config = { environmentId: env, apiUrl: api };
+    const refusalOf = async (promise: Promise<unknown>) => {
+      try { await promise; } catch (err) {
+        if (err instanceof Response) return { status: err.status, code: ((await err.json()) as any).error.code };
+      }
+      return null;
+    };
+
+    const plain = await requireAuth(await request({}), config);
+    check('a token without the new claims passes requireAuth exactly as before', plain.isSignedIn && plain.pendingTasks.length === 0 && plain.isMfaVerified === false);
+
+    const pending = await getAuth(await request({ pending_tasks: ['setup_mfa'] }), config);
+    check('getAuth reports pending tasks', pending.pendingTasks.join() === 'setup_mfa');
+    const refused = await refusalOf(requireAuth(await request({ pending_tasks: ['setup_mfa'] }), config));
+    check('requireAuth refuses a session with a pending task', refused?.status === 403 && refused.code === 'session_task_pending');
+    const allowed = await requireAuth(await request({ pending_tasks: ['setup_mfa'] }), config, { allowPendingTasks: true });
+    check('unless the route allows it', allowed.isSignedIn);
+
+    const notMfa = await refusalOf(requireAuth(await request({}), config, { requireMfa: true }));
+    check('requireMfa refuses a session without a second factor', notMfa?.status === 403 && notMfa.code === 'mfa_required');
+    const mfa = await requireAuth(await request({ amr: ['pwd', 'mfa'] }), config, { requireMfa: true });
+    check('and accepts one that passed it', mfa.isMfaVerified);
+
+    globalThis.fetch = realFetch;
+  }
+
   console.log(
     failed === 0
       ? `\n\x1b[1m${passed} passed, ${failed} failed\x1b[0m`

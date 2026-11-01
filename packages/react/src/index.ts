@@ -95,6 +95,7 @@ export {
   type OrganizationListProps,
 } from './components/OrganizationList.js';
 export { UserAvatar, type UserAvatarProps } from './components/UserAvatar.js';
+export { TaskSetupMfa, type TaskSetupMfaProps } from './components/TwoStep.js';
 
 export {
   EmailUnverified,
@@ -120,6 +121,12 @@ export type {
   ZevAuthState,
   ZevAuthUser,
   UserSession,
+  SignInResult,
+  SecondFactorChallenge,
+  SessionTask,
+  MfaSettings,
+  MfaStatus,
+  MfaFactor,
 } from '@zevauth/js';
 export { ZevAuthError } from '@zevauth/js';
 export { useZevTheme } from './components/Brandable.js';

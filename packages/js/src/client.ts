@@ -1,3 +1,4 @@
+import { takePendingPkce } from './internal/pkce.js';
 import type { HandoffError } from './types.js';
 import { Http } from './internal/http.js';
 import { RefreshCoordinator } from './internal/refresh-coordinator.js';
@@ -6,7 +7,8 @@ import {
   defaultStorage,
   type SessionStorageAdapter,
 } from './internal/tokens.js';
-import { SignInFlow, type SessionResponse } from './flows/sign-in.js';
+import { SignInFlow, type SessionResponse, type SignInResponse } from './flows/sign-in.js';
+import { MfaFlow } from './flows/mfa.js';
 import { SignUpFlow } from './flows/sign-up.js';
 import { PasswordResetFlow } from './flows/password-reset.js';
 import { OrganizationsFlow } from './flows/organizations.js';
@@ -16,7 +18,12 @@ import {
   type Branding,
   type ActiveOrganization,
   type EnvironmentConfig,
+  type OrganizationSettings,
+  type MfaSettings,
+  type SecondFactorChallenge,
+  type SessionTask,
   type SignInMethod,
+  type SignInResult,
   type ZevAuthState,
   type ZevAuthUser,
 } from './types.js';
@@ -71,24 +78,36 @@ export class ZevAuth {
       );
     }
 
+    const storage = options.storage ?? defaultStorage();
+    /*
+     * Per environment, like the session, and kept apart from it: signing
+     * out ends the session but deliberately keeps the device remembered,
+     * which is the point of remembering it. The server ends a device on
+     * password change or factor removal.
+     */
+    const deviceKey = `zevauth.device.${environmentOf(options.publishableKey)}`;
+
     this.http = new Http({
       baseUrl: options.apiUrl ?? inferApiUrl(options.publishableKey),
       publishableKey: options.publishableKey,
       fetch: options.fetch,
+      deviceToken: () => storage.get(deviceKey),
     });
 
-    this.tokens = new TokenStore(
-      options.storage ?? defaultStorage(),
-      environmentOf(options.publishableKey),
-    );
+    this.tokens = new TokenStore(storage, environmentOf(options.publishableKey));
 
     this.coordinator = new RefreshCoordinator({
       read: () => this.tokens.readPersisted(),
       perform: (refreshToken) => this.performRefresh(refreshToken),
     });
 
-    const adopt = (response: SessionResponse) => this.adopt(response);
-    this.signIn = new SignInFlow(this.http, adopt);
+    const adopt = (response: SignInResponse) => this.adopt(response);
+    this.signIn = new SignInFlow(
+      this.http,
+      adopt,
+      () => this.challenge?.id ?? null,
+      (token) => storage.set(deviceKey, token),
+    );
     this.signUp = new SignUpFlow(this.http, adopt);
     this.passwordReset = new PasswordResetFlow(this.http);
 
@@ -96,7 +115,35 @@ export class ZevAuth {
     this.organizations = new OrganizationsFlow(this.http, token, (id) =>
       this.setActiveOrganization(id),
     );
-    this.me = new UserFlow(this.http, token, (user) => this.replaceUser(user));
+    this.mfa = new MfaFlow(this.http, token, () => this.coordinator.refresh());
+    this.me = new UserFlow(this.http, token, (user) => this.replaceUser(user), this.mfa);
+  }
+
+  /**
+   * The signed-in person's own two-step verification. Also reachable as
+   * `me.mfa`.
+   */
+  readonly mfa: MfaFlow;
+
+  /**
+   * A sign-in waiting for its second factor. In memory only: a reload
+   * starts the sign-in again, which is what a five-minute challenge
+   * should do anyway, and nothing that proves half a sign-in is written
+   * to storage.
+   */
+  private challenge: { id: string; factors: string[]; expiresAt: string } | null = null;
+
+  /** What the session must still do, from its latest response. */
+  private tasks: string[] = [];
+
+  /** The second step a sign-in is waiting for, or null. */
+  get secondFactor(): SecondFactorChallenge | null {
+    return this.challenge ? { factors: this.challenge.factors, expiresAt: this.challenge.expiresAt } : null;
+  }
+
+  /** What the session must still do, e.g. `setup_mfa`. Usually empty. */
+  get pendingTasks(): SessionTask[] {
+    return [...this.tasks];
   }
 
   // ── Lifecycle ───────────────────────────────────────────────────
@@ -182,6 +229,33 @@ export class ZevAuth {
     return this.environment?.emailVerification;
   }
 
+  /**
+   * The app's two-step policy, or null from an API older than it. The
+   * server enforces it regardless; this is for drawing the right screen.
+   */
+  get mfaSettings(): MfaSettings | null {
+    return this.environment?.mfa ?? null;
+  }
+
+  /**
+   * Abandons a sign-in that is waiting for its second factor, back to
+   * signed out. For a "Back to sign in" link; the server-side challenge
+   * simply expires.
+   */
+  cancelSecondFactor(): void {
+    if (!this.challenge) return;
+    this.challenge = null;
+    this.emit();
+  }
+
+  /**
+   * The organization policy, or `null` from an API older than it, in
+   * which case a UI should behave as it did before it could know.
+   */
+  get organizationSettings(): OrganizationSettings | null {
+    return this.environment?.organizations ?? null;
+  }
+
   get signInMethods(): SignInMethod[] {
     return this.environment?.signInMethods ?? [];
   }
@@ -263,6 +337,8 @@ export class ZevAuth {
     }
 
     this.tokens.clear();
+    this.challenge = null;
+    this.tasks = [];
     this.emit();
   }
 
@@ -289,13 +365,33 @@ export class ZevAuth {
       { refreshToken: stored.refreshToken, organizationId },
     );
 
-    this.adopt(response);
+    this.adoptSession(response);
   }
 
   // ── Internals ───────────────────────────────────────────────────
 
+  /**
+   * Adopts a sign-in response and tells everyone about it. A response
+   * that asks for a second factor holds the challenge instead.
+   */
+  private adopt(response: SignInResponse): SignInResult {
+    if ('status' in response && response.status === 'needs_second_factor') {
+      this.challenge = response.challenge;
+      this.emit();
+      return {
+        status: 'needs_second_factor',
+        factors: response.challenge.factors,
+        expiresAt: response.challenge.expiresAt,
+      };
+    }
+    this.adoptSession(response as SessionResponse);
+    return { status: 'complete' };
+  }
+
   /** Adopts a session response and tells everyone about it. */
-  private adopt(response: SessionResponse): void {
+  private adoptSession(response: SessionResponse): void {
+    this.challenge = null;
+    this.tasks = response.session.pendingTasks ?? [];
     /*
      * A response without a user must never erase the one we have.
      *
@@ -359,6 +455,17 @@ export class ZevAuth {
        */
       this.tokens.clear();
       if (!(err instanceof ZevAuthError)) throw err;
+      /*
+       * A ZevID session past its fresh-sign-in window. Not an error the
+       * person caused: say why, where <SignIn> will show it, so "you
+       * were signed out" reads as routine rather than as something broken.
+       */
+      if (err.code === 'reauthentication_required') {
+        this.pendingHandoffError = {
+          code: 'zevid_reauthentication_required',
+          description: 'For your security, please sign in with ZevID again.',
+        };
+      }
     }
   }
 
@@ -366,7 +473,7 @@ export class ZevAuth {
     const response = await this.http.post<SessionResponse>('/v1/auth/refresh', {
       refreshToken,
     });
-    this.adopt(response);
+    this.adoptSession(response);
   }
 
   /**
@@ -407,10 +514,37 @@ export class ZevAuth {
       return;
     }
 
+    let hadPkce = false;
     try {
-      const response = await this.http.post<SessionResponse>(
+      /*
+       * A ZevID sign-in this tab started with PKCE: the state must be the
+       * one we sent (otherwise someone else's sign-in is being planted
+       * here), and the exchange proves the verifier and names the exact
+       * redirect the code was sent to. Without a pending PKCE, the code
+       * is exchanged as it always was.
+       */
+      const pkce = takePendingPkce();
+      hadPkce = pkce !== null;
+      let binding: { codeVerifier: string; redirectUri: string } | null = null;
+      if (pkce) {
+        if (url.searchParams.get('state') !== pkce.state) {
+          this.pendingHandoffError = {
+            code: 'state_mismatch',
+            description: 'This sign-in was not started from this page. Please try again.',
+          };
+          return;
+        }
+        const destination = new URL(url.toString());
+        destination.searchParams.delete('code');
+        destination.searchParams.delete('state');
+        binding = { codeVerifier: pkce.verifier, redirectUri: destination.toString() };
+      }
+
+      // A hosted or ZevID sign-in can need a second factor too; `adopt`
+      // holds the challenge for the UI to finish.
+      const response = await this.http.post<SignInResponse>(
         '/v1/auth/handoff/exchange',
-        { code },
+        binding ? { code, ...binding } : { code },
       );
       this.adopt(response);
     } finally {
@@ -423,6 +557,8 @@ export class ZevAuth {
        * `replaceState` removes it without adding a history entry.
        */
       url.searchParams.delete('code');
+      // Ours only when this tab sent one; a page's own `state` stays.
+      if (hadPkce) url.searchParams.delete('state');
       globalThis.history?.replaceState({}, '', url.toString());
     }
   }
@@ -467,7 +603,7 @@ export class ZevAuth {
 
     try {
       if (flow === 'sign-in') {
-        const response = await this.http.post<SessionResponse>(
+        const response = await this.http.post<SignInResponse>(
           '/v1/auth/magic-link/verify',
           { token },
         );
@@ -509,6 +645,8 @@ export class ZevAuth {
       isLoaded: this.loaded,
       user: this.tokens.getUser(),
       organization: this.tokens.getOrganization(),
+      secondFactor: this.secondFactor,
+      pendingTasks: this.pendingTasks,
     };
   }
 

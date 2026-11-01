@@ -118,7 +118,12 @@ export type AppearanceElementKey =
   | 'listItem'
   | 'modal'
   | 'modalBackdrop'
-  | 'userAvatar';
+  | 'userAvatar'
+  | 'codeInput'
+  | 'checkbox'
+  | 'qrCode'
+  | 'secretKey'
+  | 'recoveryCodes';
 
 /**
  * A class name (your stylesheet, Tailwind) or a style object.
@@ -232,6 +237,12 @@ export const ELEMENT_CLASS: Record<AppearanceElementKey, string | null> = {
   modalBackdrop: 'zv-modal-backdrop',
   // Adds to `avatar`, so it can be told apart from the menu's avatar.
   userAvatar: null,
+  // Adds to `input`: the one-time code field, set for digits.
+  codeInput: null,
+  checkbox: 'zv-checkbox',
+  qrCode: 'zv-qr',
+  secretKey: 'zv-secret',
+  recoveryCodes: 'zv-recovery-codes',
 };
 
 interface ResolvedElement {

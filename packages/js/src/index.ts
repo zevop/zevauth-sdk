@@ -9,11 +9,22 @@ export {
 } from './flows/organizations.js';
 export { UserFlow } from './flows/user.js';
 export {
+  MfaFlow,
+  type MfaFactor,
+  type MfaStatus,
+  type TotpEnrollment,
+} from './flows/mfa.js';
+export {
   ZevAuthError,
   type ActiveOrganization,
   type Branding,
   type EnvironmentConfig,
+  type OrganizationSettings,
+  type MfaSettings,
+  type SecondFactorChallenge,
+  type SessionTask,
   type SignInMethod,
+  type SignInResult,
   type UserSession,
   type ZevAuthSession,
   type ZevAuthState,

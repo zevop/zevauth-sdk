@@ -1,4 +1,4 @@
-import { useState, type FormEvent, type ReactNode } from 'react';
+import { useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { ZevAuthError } from '@zevauth/js';
 import { useComponentAppearance } from '../internal/context.js';
 import type { Appearance } from '../internal/appearance.js';
@@ -17,6 +17,7 @@ import {
   ZevMark,
   type SignInLayout,
 } from './parts.js';
+import { SecondFactorStep, TaskSetupMfa } from './TwoStep.js';
 
 export interface SignInProps {
   /** Where to send somebody after a successful sign-in. */
@@ -137,6 +138,8 @@ export function SignIn({
     () => client.takeHandoffError()?.description ?? null,
   );
   const [isBusy, setIsBusy] = useState(false);
+  const setupShown = useRef(false);
+  const [setupDone, setSetupDone] = useState(false);
 
   const methods = client.signInMethods;
 
@@ -176,14 +179,37 @@ export function SignIn({
   const zevIdIsSecondary =
     hasZevId && hasPassword && secondaryMethods === 'collapsed';
 
+  /*
+   * An app that requires two-step verification signs a person in with a
+   * `setup_mfa` task, and almost nothing works until it is done. Showing
+   * the setup here, rather than leaving every app to notice the task, is
+   * the difference between a working sign-in and a stuck one. Only
+   * environments with a required policy (or an organization requiring
+   * it) ever produce the task, so no other screen changes. Latched, like
+   * TaskSetupMfa itself, because finishing setup clears the task before
+   * the recovery codes have been shown.
+   */
+  const pendingSetup = Boolean(state.user && (state.pendingTasks ?? []).includes('setup_mfa'));
+  if (pendingSetup) setupShown.current = true;
+
   if (state.isLoaded && state.user) {
+    if (setupShown.current && !setupDone) {
+      return (
+        <TaskSetupMfa
+          appearance={appearance}
+          localization={localization}
+          className={className}
+          onComplete={() => setSetupDone(true)}
+        />
+      );
+    }
     if (afterSignInUrl && typeof window !== 'undefined') {
       window.location.assign(afterSignInUrl);
     }
     return <>{children ?? null}</>;
   }
 
-  async function run(action: () => Promise<void>) {
+  async function run(action: () => Promise<unknown>) {
     setIsBusy(true);
     setError(null);
     try {
@@ -238,7 +264,15 @@ export function SignIn({
         {client.isTestMode ? <TestModeBadge /> : null}
         <Identity branding={branding} />
 
-        {stage.name === 'reset-request' ? (
+        {state.secondFactor ? (
+          /*
+           * The first step succeeded and a second factor is due, whether
+           * the first step happened here or before the page loaded (a
+           * magic link, the ZevID handoff). Takes precedence over every
+           * other stage, and only exists for people who set up two-step.
+           */
+          <SecondFactorStep client={client} />
+        ) : stage.name === 'reset-request' ? (
           <>
             <Heading
               title={t.resetTitle}

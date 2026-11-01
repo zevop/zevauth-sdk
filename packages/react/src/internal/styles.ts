@@ -708,6 +708,88 @@ const AUTHORED = `
   .zv-nav-item { width: auto; }
 }
 
+/* ── Two-step verification ──────────────────────────────────────── */
+/*
+ * The code field reads as a code: wide letter-spacing and tabular
+ * digits, centred, so six digits look like six digits and a mistyped
+ * one is easy to spot.
+ */
+.zv-input[data-kind='code'] {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: .32em;
+  text-align: center;
+  font-size: calc(var(--zv-font-size) * 1.15);
+}
+.zv-checkbox {
+  display: flex; align-items: center; gap: 8px;
+  font-size: calc(var(--zv-font-size) * 0.926);
+  cursor: pointer;
+}
+.zv-root.zv-root .zv-checkbox {
+  color: var(--zv-text);
+  font-size: calc(var(--zv-font-size) * 0.926);
+  font-weight: 400;
+}
+.zv-checkbox input { width: 15px; height: 15px; margin: 0; accent-color: var(--zv-accent); }
+/*
+ * The QR code sits on white in both themes: authenticator apps read
+ * dark-on-light reliably and a dark-mode inversion not always.
+ */
+.zv-qr {
+  align-self: center;
+  display: block;
+  width: 168px; height: 168px;
+  padding: 10px;
+  background: #ffffff;
+  border: 1px solid var(--zv-border);
+  border-radius: var(--zv-radius);
+}
+.zv-qr[data-loading='true'] { background: color-mix(in srgb, var(--zv-border) 30%, var(--zv-surface)); }
+.zv-secret {
+  font-family: 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: calc(var(--zv-font-size) * 0.926);
+  letter-spacing: .06em;
+  word-break: break-all;
+  padding: 8px 10px;
+  border: 1px dashed var(--zv-border);
+  border-radius: var(--zv-radius);
+  user-select: all;
+}
+/*
+ * Stated in full: a host's \`code\`/\`pre\` or \`span\` styles painted
+ * this key light grey behind near-white text in dark mode.
+ */
+.zv-root.zv-root .zv-secret {
+  display: block;
+  color: var(--zv-text);
+  background: color-mix(in srgb, var(--zv-border) 18%, var(--zv-surface));
+  font-family: 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: calc(var(--zv-font-size) * 0.926);
+}
+.zv-recovery-codes {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 14px;
+  margin: 0; padding: 12px 14px;
+  list-style: none;
+  font-family: 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: calc(var(--zv-font-size) * 0.926);
+  border: 1px solid var(--zv-border);
+  border-radius: var(--zv-radius);
+  background: color-mix(in srgb, var(--zv-border) 18%, var(--zv-surface));
+}
+.zv-root.zv-root .zv-recovery-codes li { color: var(--zv-text); }
+.zv-button-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.zv-button-row .zv-button { width: auto; }
+/*
+ * Side by side and sized to their text suits a settings screen (the
+ * wide profile card). In the narrow card the sign-in and set-up screens
+ * use, every other action is full width, so a row there stacks and
+ * matches; otherwise "Get started" sat alone at the left edge of a
+ * centred card.
+ */
+.zv-card:not([data-size='wide']) .zv-button-row { flex-direction: column; }
+.zv-card:not([data-size='wide']) .zv-button-row .zv-button { width: 100%; }
+
 /* ── Active devices ─────────────────────────────────────────────── */
 .zv-session-list { display: flex; flex-direction: column; }
 .zv-session {

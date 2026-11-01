@@ -15,9 +15,9 @@ export interface CreateOrganizationProps {
   /**
    * Ask for a slug as well as a name.
    *
-   * Off by default, because whether slugs are used is a console setting
-   * the browser cannot read, and a field the server then refuses is
-   * worse than no field. Turn it on when your environment uses them.
+   * Follows the console's slug setting when left out. Set it to force
+   * the field on or off; an API too old to report the setting means
+   * off, since a field the server then refuses is worse than no field.
    */
   showSlug?: boolean;
   /**
@@ -61,7 +61,7 @@ export function createOrganizationErrors(strings: Strings): Record<string, strin
 export function CreateOrganization({
   afterCreateOrganizationUrl,
   onCreated,
-  showSlug = false,
+  showSlug: showSlugProp,
   showLogoStep = true,
   onCancel,
   appearance,
@@ -77,6 +77,8 @@ export function CreateOrganization({
     strings,
   } = useComponentAppearance('<CreateOrganization>', appearance, localization);
   const t = strings.createOrganization;
+  const policy = client.organizationSettings;
+  const showSlug = showSlugProp ?? policy?.slugsEnabled ?? false;
 
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
@@ -145,6 +147,14 @@ export function CreateOrganization({
           <>
             <Heading title={t.title} subtitle={null} fallbackTitle={t.title} />
             {error ? <Alert>{error}</Alert> : null}
+            {/*
+              Said before anyone types, when the environment reports it.
+              An API that does not report the policy gets the form, and
+              the server's own refusal, as before.
+            */}
+            {policy && !policy.creationAllowed ? (
+              <div {...el('notice')}>{t.notAllowed}</div>
+            ) : (
             <form {...el('fields')} onSubmit={onSubmit}>
               <div {...el('field')}>
                 <label {...el('label')} htmlFor="zv-org-name">
@@ -202,6 +212,7 @@ export function CreateOrganization({
                 </button>
               ) : null}
             </form>
+            )}
           </>
         )}
       </div>

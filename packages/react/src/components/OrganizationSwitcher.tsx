@@ -54,6 +54,7 @@ export function OrganizationSwitcher({
   className,
 }: OrganizationSwitcherProps) {
   const {
+    client,
     state,
     branding,
     appearance: appearanceLayers,
@@ -65,7 +66,12 @@ export function OrganizationSwitcher({
   const [isOpen, setIsOpen] = useState(false);
   const [switchingTo, setSwitchingTo] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
-  const canCreate = createOrganizationMode !== 'none';
+  /*
+   * Opt-in, and only where the environment allows it. An API too old
+   * to report the policy keeps the developer's choice, as before.
+   */
+  const canCreate =
+    createOrganizationMode !== 'none' && client.organizationSettings?.creationAllowed !== false;
   const wrapRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
 

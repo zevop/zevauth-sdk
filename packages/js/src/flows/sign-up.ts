@@ -4,7 +4,7 @@ import type { SessionResponse } from './sign-in.js';
 export class SignUpFlow {
   constructor(
     private readonly http: Http,
-    private readonly adopt: (response: SessionResponse) => void,
+    private readonly adopt: (response: SessionResponse) => unknown,
   ) {}
 
   /**

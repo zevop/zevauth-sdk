@@ -189,7 +189,14 @@ export function OrganizationProfile({
       .finally(() => setIsLeaving(false));
   };
 
-  const canDelete = (organization.permissions ?? []).includes('org:delete');
+  /*
+   * The permission, and the environment allowing deletion from the app
+   * at all. An API too old to report the policy leaves the permission
+   * as the only check, as before.
+   */
+  const canDelete =
+    (organization.permissions ?? []).includes('org:delete') &&
+    client.organizationSettings?.deleteAllowed !== false;
 
   const imageBlock = canManageOrg ? (
     <div {...el('fields')}>

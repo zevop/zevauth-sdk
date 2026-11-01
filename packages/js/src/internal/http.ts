@@ -4,6 +4,12 @@ export interface HttpOptions {
   baseUrl: string;
   publishableKey: string;
   fetch?: typeof globalThis.fetch;
+  /**
+   * A remembered two-step device, if this browser has one. Sent on
+   * sign-in routes only (`/v1/auth/…`), where the server decides whether
+   * to ask for a second factor; nothing else needs it.
+   */
+  deviceToken?: () => string | null;
 }
 
 /**
@@ -72,6 +78,12 @@ export class Http {
     return this.send<T>('GET', path, undefined, init);
   }
 
+  private deviceHeader(path: string): Record<string, string> {
+    if (!path.startsWith('/v1/auth/')) return {};
+    const token = this.options.deviceToken?.();
+    return token ? { 'X-Zevauth-Device': token } : {};
+  }
+
   private async send<T>(
     method: string,
     path: string,
@@ -91,6 +103,7 @@ export class Http {
            */
           Authorization: `Bearer ${init.accessToken ?? this.options.publishableKey}`,
           ...(body ? { 'Content-Type': 'application/json' } : {}),
+          ...this.deviceHeader(path),
         },
         body: body ? JSON.stringify(body) : undefined,
       });

@@ -19,6 +19,7 @@ import { SignInWithZevId } from '../src/components/SignInWithZevId';
 import { readableOn } from '../src/components/Brandable';
 import { OrganizationProfile } from '../src/components/OrganizationProfile';
 import { SignUp } from '../src/components/SignUp';
+import { TaskSetupMfa } from '../src/components/TwoStep';
 import { CreateOrganization, createOrganizationErrors } from '../src/components/CreateOrganization';
 import { OrganizationList } from '../src/components/OrganizationList';
 import { OrganizationSwitcher } from '../src/components/OrganizationSwitcher';
@@ -83,6 +84,10 @@ function clientIn(state: {
   methods?: string[];
   branding?: Partial<typeof BRANDING> | null;
   isTestMode?: boolean;
+  orgSettings?: { enabled: boolean; creationAllowed: boolean; slugsEnabled: boolean; deleteAllowed: boolean; maxPerUser: number | null } | null;
+  secondFactor?: { factors: string[]; expiresAt: string } | null;
+  pendingTasks?: string[];
+  mfaSettings?: { policy: 'off' | 'optional' | 'required'; factors: string[]; rememberDeviceDays: number } | null;
 }): ZevAuth {
   const client = createZevAuth({
     publishableKey: 'pk_test_x',
@@ -109,6 +114,12 @@ function clientIn(state: {
     get: () =>
       state.branding === null ? null : { ...BRANDING, ...state.branding },
   });
+  Object.defineProperty(client, 'organizationSettings', {
+    get: () => state.orgSettings ?? null,
+  });
+  Object.defineProperty(client, 'secondFactor', { get: () => state.secondFactor ?? null });
+  Object.defineProperty(client, 'pendingTasks', { get: () => state.pendingTasks ?? [] });
+  Object.defineProperty(client, 'mfaSettings', { get: () => state.mfaSettings ?? null });
   Object.defineProperty(client, 'isTestMode', {
     get: () => state.isTestMode ?? false,
   });
@@ -529,6 +540,11 @@ console.log('\n\x1b[1mOrganization suite, profiles and avatar (all opt-in)\x1b[0
   check('and no slug unless asked, since the browser cannot know the policy', !create.includes('zv-org-slug'));
   check('with showSlug it asks for one', render(clientIn({ ...signedIn }), <CreateOrganization showSlug />).includes('zv-org-slug'));
   check('and renders nothing for somebody signed out', render(clientIn({ loaded: true, user: null }), <CreateOrganization />) === '');
+  const withSlugs = render(clientIn({ ...signedIn, orgSettings: { enabled: true, creationAllowed: true, slugsEnabled: true, deleteAllowed: true, maxPerUser: null } }), <CreateOrganization />);
+  check('the slug field follows the console setting when the prop is left out', withSlugs.includes('zv-org-slug'));
+  check('and the prop still overrides it', !render(clientIn({ ...signedIn, orgSettings: { enabled: true, creationAllowed: true, slugsEnabled: true, deleteAllowed: true, maxPerUser: null } }), <CreateOrganization showSlug={false} />).includes('zv-org-slug'));
+  const closed = render(clientIn({ ...signedIn, orgSettings: { ...{ enabled: true, creationAllowed: true, slugsEnabled: true, deleteAllowed: true, maxPerUser: null }, creationAllowed: false } }), <CreateOrganization />);
+  check('when creation is off it says so instead of offering a form that will be refused', closed.includes('turned off') && !closed.includes('id="zv-org-name"'));
 
   const codes = createOrganizationErrors(en);
   const taken = new ZevAuthError('slug taken (server)', 'organization_slug_taken', 409);
@@ -569,6 +585,45 @@ console.log('\n\x1b[1mOrganization suite, profiles and avatar (all opt-in)\x1b[0
 
   check('devices are described in words people recognise', JSON.stringify(describeUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Chrome/130.0 Safari/537.36')) === '{"browser":"Chrome","os":"macOS"}');
   check('Edge is not mistaken for Chrome', describeUserAgent('Mozilla/5.0 (Windows NT 10.0) Chrome/130.0 Safari/537.36 Edg/130.0')?.browser === 'Edge');
+}
+
+console.log('\n\x1b[1mTwo-step verification\x1b[0m');
+{
+  const base = { loaded: true, user: null, methods: ['email_password'] } as const;
+  const challenge = { factors: ['totp', 'recovery_code'], expiresAt: '2030-01-01T00:00:00Z' };
+
+  const step = render(clientIn({ ...base, secondFactor: challenge }), <SignIn />);
+  check('a pending second factor replaces the form with the code step', step.includes('Two-step verification') && !step.includes('Forgot your password?'));
+  check('the code field is set up for one-time codes and the number pad', step.includes('autoComplete="one-time-code"') && step.includes('inputMode="numeric"'));
+  check('with a way to use a recovery code and a way back', step.includes('Use a recovery code instead') && step.includes('Back to sign in'));
+  check('and no "remember this device" unless the app offers it', !step.includes('Remember this device'));
+
+  const remember = render(clientIn({ ...base, secondFactor: challenge, mfaSettings: { policy: 'optional', factors: ['totp'], rememberDeviceDays: 30 } }), <SignIn />);
+  check('the app offering it adds the checkbox, with its days', remember.includes('Remember this device for 30 days'));
+
+  const onSignUp = render(clientIn({ ...base, secondFactor: challenge }), <SignUp />);
+  check('the same step appears in SignUp', onSignUp.includes('Two-step verification'));
+
+  const localized = render(clientIn({ ...base, secondFactor: challenge }), <SignIn localization={{ mfa: { challengeTitle: 'Vérification' } }} />);
+  check('and its words can be changed', localized.includes('Vérification'));
+
+  const noChallenge = render(clientIn({ ...base }), <SignIn />);
+  check('no challenge, no step: the form renders as before', !noChallenge.includes('Two-step verification') && noChallenge.includes('Forgot your password?'));
+
+  const task = render(clientIn({ loaded: true, user: USER, pendingTasks: ['setup_mfa'] }), <SignIn><p>app</p></SignIn>);
+  check('a sign-in that ends with a setup task shows the setup', task.includes('Set up two-step verification') && !task.includes('>app<'));
+  const noTask = render(clientIn({ loaded: true, user: USER }), <SignIn><p>app</p></SignIn>);
+  check('without the task, a signed-in SignIn still renders its children', noTask.includes('>app<') && !noTask.includes('two-step'));
+
+  check('TaskSetupMfa renders nothing without the task', render(clientIn({ loaded: true, user: USER }), <TaskSetupMfa />) === '');
+  check('and the setup screen with it', render(clientIn({ loaded: true, user: USER, pendingTasks: ['setup_mfa'] }), <TaskSetupMfa />).includes('Get started'));
+
+  const profileDefault = render(clientIn({ loaded: true, user: USER }), <UserProfile />);
+  check('UserProfile shows no two-step section by default', !profileDefault.includes('Two-step verification'));
+  const profileOff = render(clientIn({ loaded: true, user: USER, mfaSettings: { policy: 'required', factors: ['totp'], rememberDeviceDays: 0 } }), <UserProfile showMfa={false} />);
+  check('showMfa={false} keeps it out even when the app requires it', !profileOff.includes('Two-step verification'));
+  const profileOn = render(clientIn({ loaded: true, user: USER }), <UserProfile showMfa />);
+  check('showMfa shows the section', profileOn.includes('Two-step verification'));
 }
 
 console.log('\n\x1b[1mLocalization\x1b[0m');

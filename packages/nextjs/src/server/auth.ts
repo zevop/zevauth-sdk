@@ -12,6 +12,14 @@ export interface ServerAuth {
   organizationId: string | null;
   organizationRole: string | null;
   claims: ZevAuthClaims | null;
+  /**
+   * What the session must still do, e.g. `setup_mfa` when the app
+   * requires two-step verification and this person has none yet.
+   * `requireAuth` refuses such a session unless told otherwise.
+   */
+  pendingTasks: string[];
+  /** Whether this session passed a second factor at sign-in. */
+  isMfaVerified: boolean;
   /** True when a permission is present on the active organization. */
   has: (check: { role?: string; permission?: string }) => boolean;
 }
@@ -23,6 +31,8 @@ const SIGNED_OUT: ServerAuth = {
   organizationId: null,
   organizationRole: null,
   claims: null,
+  pendingTasks: [],
+  isMfaVerified: false,
   has: () => false,
 };
 
@@ -60,6 +70,8 @@ export async function getAuth(
       organizationId: claims.org_id ?? null,
       organizationRole: claims.org_role ?? null,
       claims,
+      pendingTasks: claims.pending_tasks ?? [],
+      isMfaVerified: (claims.amr ?? []).includes('mfa'),
       has: ({ role, permission }) => {
         if (!claims.org_id) return false;
         if (role && claims.org_role !== role) return false;
@@ -84,17 +96,39 @@ export async function getAuth(
 export async function requireAuth(
   request: Request,
   config: ZevAuthServerConfig,
+  options: {
+    /**
+     * Serve a session that still has pending tasks (`setup_mfa`). Only
+     * for routes that help finish the task; everything else should leave
+     * this off, so a person cannot skip a step the app requires.
+     */
+    allowPendingTasks?: boolean;
+    /** Refuse unless this session passed a second factor at sign-in. */
+    requireMfa?: boolean;
+  } = {},
 ): Promise<ServerAuth> {
   const auth = await getAuth(request, config);
 
   if (!auth.isSignedIn) {
-    throw new Response(
-      JSON.stringify({
-        error: { code: 'unauthorized', message: 'Sign in to continue.' },
-      }),
-      { status: 401, headers: { 'Content-Type': 'application/json' } },
-    );
+    throw refusal(401, 'unauthorized', 'Sign in to continue.');
+  }
+  // Never true for a token without the claim, so routes written before
+  // MFA existed behave exactly as they did.
+  if (auth.pendingTasks.length > 0 && !options.allowPendingTasks) {
+    throw refusal(403, 'session_task_pending', 'Finish setting up two-step verification to continue.', {
+      pendingTasks: auth.pendingTasks,
+    });
+  }
+  if (options.requireMfa && !auth.isMfaVerified) {
+    throw refusal(403, 'mfa_required', 'Sign in with two-step verification to continue.');
   }
 
   return auth;
+}
+
+function refusal(status: number, code: string, message: string, extra: Record<string, unknown> = {}): Response {
+  return new Response(JSON.stringify({ error: { code, message, ...extra } }), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  });
 }

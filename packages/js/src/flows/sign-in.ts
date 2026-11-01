@@ -1,5 +1,7 @@
 import type { Http } from '../internal/http.js';
-import type { ActiveOrganization, ZevAuthUser } from '../types.js';
+import { ZevAuthError } from '../types.js';
+import type { ActiveOrganization, SignInResult, ZevAuthUser } from '../types.js';
+import { beginPkce } from '../internal/pkce.js';
 
 export interface SessionResponse {
   user: ZevAuthUser;
@@ -8,8 +10,18 @@ export interface SessionResponse {
     refreshToken: string;
     expiresIn: number;
     organization?: ActiveOrganization | null;
+    /** Present only when the session has something left to do. */
+    pendingTasks?: string[];
   };
 }
+
+/** What a sign-in route returns instead of a session when a second factor is needed. */
+export interface SecondFactorResponse {
+  status: 'needs_second_factor';
+  challenge: { id: string; factors: string[]; expiresAt: string };
+}
+
+export type SignInResponse = SessionResponse | SecondFactorResponse;
 
 /**
  * Every way in.
@@ -26,7 +38,11 @@ export interface SessionResponse {
 export class SignInFlow {
   constructor(
     private readonly http: Http,
-    private readonly adopt: (response: SessionResponse) => void,
+    private readonly adopt: (response: SignInResponse) => SignInResult,
+    /** The challenge id of a sign-in waiting for its second factor, if any. */
+    private readonly pendingChallengeId: () => string | null,
+    /** Keeps a remembered-device token for later sign-ins. */
+    private readonly rememberDevice: (token: string) => void = () => {},
   ) {}
 
   /**
@@ -39,12 +55,48 @@ export class SignInFlow {
   async withPassword(params: {
     identifier: string;
     password: string;
-  }): Promise<void> {
-    const response = await this.http.post<SessionResponse>('/v1/auth/signin', {
+  }): Promise<SignInResult> {
+    const response = await this.http.post<SignInResponse>('/v1/auth/signin', {
       email: params.identifier,
       password: params.password,
     });
-    this.adopt(response);
+    return this.adopt(response);
+  }
+
+  /**
+   * Finishes a sign-in that needed a second factor: a 6-digit code from
+   * the person's authenticator app, or one of their recovery codes.
+   *
+   * Uses the challenge from the sign-in that just happened in this
+   * client; pass `challengeId` only if you are driving the API yourself.
+   */
+  async verifySecondFactor(params: {
+    code: string;
+    challengeId?: string;
+    /**
+     * Skip the second step on this device next time. Honoured only when
+     * the app remembers devices (a console setting); otherwise ignored.
+     */
+    rememberDevice?: boolean;
+  }): Promise<SignInResult> {
+    const challengeId = params.challengeId ?? this.pendingChallengeId();
+    if (!challengeId) {
+      throw new ZevAuthError(
+        'There is no sign-in waiting for a second factor. Sign in first.',
+        'mfa_challenge_expired',
+        401,
+      );
+    }
+    const response = await this.http.post<SignInResponse & { trustedDevice?: { token: string; expiresAt: string } }>(
+      '/v1/auth/mfa/verify',
+      {
+        challengeId,
+        code: params.code,
+        ...(params.rememberDevice ? { rememberDevice: true } : {}),
+      },
+    );
+    if (response.trustedDevice) this.rememberDevice(response.trustedDevice.token);
+    return this.adopt(response);
   }
 
   /**
@@ -90,12 +142,12 @@ export class SignInFlow {
    * token itself, or a native application receiving a deep link, where
    * there is no page load for the SDK to hook.
    */
-  async verifyMagicLink(params: { token: string }): Promise<void> {
-    const response = await this.http.post<SessionResponse>(
+  async verifyMagicLink(params: { token: string }): Promise<SignInResult> {
+    const response = await this.http.post<SignInResponse>(
       '/v1/auth/magic-link/verify',
       { token: params.token },
     );
-    this.adopt(response);
+    return this.adopt(response);
   }
 
   /** Emails a short code. Same non-committal answer. */
@@ -107,12 +159,12 @@ export class SignInFlow {
   async verifyEmailCode(params: {
     email: string;
     code: string;
-  }): Promise<void> {
-    const response = await this.http.post<SessionResponse>(
+  }): Promise<SignInResult> {
+    const response = await this.http.post<SignInResponse>(
       '/v1/auth/email-code/verify',
       { email: params.email, code: params.code },
     );
-    this.adopt(response);
+    return this.adopt(response);
   }
 
   /**
@@ -124,7 +176,16 @@ export class SignInFlow {
    * that anything happened. The redirect comes back to a URL this app
    * registered, carrying a code the SDK exchanges on load.
    */
-  withZevId(params: { redirectUrl?: string } = {}): void {
+  withZevId(params?: { redirectUrl?: string; pkce?: false }): void;
+  /**
+   * With `pkce: true`, the sign-in is bound to this tab: a PKCE challenge
+   * and a `state` go to ZevAuth, and the code that comes back can only be
+   * exchanged with this tab's verifier. Returns a promise because the
+   * challenge is hashed with Web Crypto before the redirect.
+   */
+  withZevId(params: { redirectUrl?: string; pkce: true }): Promise<void>;
+  withZevId(params: { redirectUrl?: string; pkce?: boolean } = {}): void | Promise<void> {
+    if (params.pkce) return this.withZevIdPkce(params.redirectUrl);
     /*
      * Built by concatenation, exactly as every fetch in this SDK builds
      * its URL, and NOT with `new URL(path, base)`.
@@ -161,5 +222,17 @@ export class SignInFlow {
     globalThis.location.assign(
       `${this.http.baseUrl}/v1/auth/zevid/start?${query}`,
     );
+  }
+
+  private async withZevIdPkce(redirectUrl?: string): Promise<void> {
+    const { challenge, state } = await beginPkce();
+    const query = new URLSearchParams({
+      publishable_key: this.http.publishableKey,
+      state,
+      code_challenge: challenge,
+      code_challenge_method: 'S256',
+    });
+    if (redirectUrl) query.set('redirect_url', redirectUrl);
+    globalThis.location.assign(`${this.http.baseUrl}/v1/auth/zevid/start?${query}`);
   }
 }

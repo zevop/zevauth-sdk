@@ -144,7 +144,7 @@ export function OrganizationList({
             </button>
           ))}
 
-          {createOrganization ? (
+          {createOrganization && client.organizationSettings?.creationAllowed !== false ? (
             <button
               type="button"
               {...el('listItem')}

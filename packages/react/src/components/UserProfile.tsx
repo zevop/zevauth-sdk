@@ -4,6 +4,7 @@ import { useComponentAppearance } from '../internal/context.js';
 import type { Appearance } from '../internal/appearance.js';
 import { errorMessage, format, type Localization } from '../internal/localization.js';
 import { ActiveDevices } from './ActiveDevices.js';
+import { MfaSection } from './TwoStep.js';
 import { Brandable } from './Brandable.js';
 import { Alert, Spinner } from './parts.js';
 import { ImageField } from './ImageField.js';
@@ -39,6 +40,14 @@ export interface UserProfileProps {
    * a way to sign each one out. Off by default.
    */
   showSessions?: boolean;
+  /**
+   * Two-step verification under Security: set it up, new recovery codes,
+   * turn it off. `true` always shows it and `false` never does. Left
+   * out, it appears only when it matters: the app requires two-step, or
+   * this person already has it, so somebody enrolled can always manage
+   * or remove it. For everybody else nothing changes.
+   */
+  showMfa?: boolean;
   /** The words on this component, merged over the provider's `localization`. */
   localization?: Localization;
   /**
@@ -69,6 +78,7 @@ export function UserProfile({
   defaultPasswordOpen = false,
   variant = 'stacked',
   showSessions = false,
+  showMfa,
   appearance,
   localization,
   className,
@@ -463,6 +473,17 @@ export function UserProfile({
   );
 
   const devices = showSessions ? <ActiveDevices client={client} /> : null;
+  /*
+   * In `auto`, only asks the API when the app's policy is not `off` (or
+   * not known), and draws nothing unless the answer says it matters.
+   */
+  const mfaPolicy = client.mfaSettings?.policy;
+  const mfa =
+    showMfa === false || (showMfa === undefined && mfaPolicy === 'off')
+      ? null
+      : (divider: boolean) => (
+          <MfaSection client={client} visibility={showMfa ? 'always' : 'auto'} divider={divider} />
+        );
 
   if (variant === 'sidebar') {
     const sections = (['profile', 'security'] as const).filter(
@@ -499,6 +520,7 @@ export function UserProfile({
             ) : (
               <>
                 {passwordForm}
+                {mfa ? mfa(true) : null}
                 {devices ? <hr {...el('sectionDivider')} /> : null}
                 {devices}
               </>
@@ -523,6 +545,8 @@ export function UserProfile({
         {section === 'all' ? <hr {...el('sectionDivider')} /> : null}
 
         {section !== 'profile' ? passwordForm : null}
+
+        {section !== 'profile' && mfa ? mfa(true) : null}
 
         {section !== 'profile' && devices ? <hr {...el('sectionDivider')} /> : null}
         {section !== 'profile' ? devices : null}

@@ -17,6 +17,7 @@ import {
   ZevMark,
   type SignInLayout,
 } from './parts.js';
+import { SecondFactorStep } from './TwoStep.js';
 
 export interface SignUpProps {
   afterSignUpUrl?: string;
@@ -166,7 +167,14 @@ export function SignUp({
         {client.isTestMode ? <TestModeBadge /> : null}
         <Identity branding={branding} />
 
-        {awaitingVerification ? (
+        {state.secondFactor ? (
+          /*
+           * Signing up with an address that already has an account and
+           * two-step (the email link signs that person in) ends in the
+           * second step, not a dead end.
+           */
+          <SecondFactorStep client={client} />
+        ) : awaitingVerification ? (
           <>
             <h1 {...el('title')}>{t.verifyTitle}</h1>
             <p {...el('subtitle')}>

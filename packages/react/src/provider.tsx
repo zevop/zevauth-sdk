@@ -73,6 +73,14 @@ export function ZevAuthProvider({
     isLoaded: client.isLoaded,
     user: client.user,
     organization: client.organization,
+    /*
+     * Read now, not left to the first emission, so the first render (and
+     * a server render) already knows about a pending second step or
+     * setup task. Optional chaining for a client from an older
+     * `@zevauth/js`, which has neither.
+     */
+    secondFactor: client.secondFactor ?? null,
+    pendingTasks: client.pendingTasks ?? [],
   });
 
   useEffect(() => {

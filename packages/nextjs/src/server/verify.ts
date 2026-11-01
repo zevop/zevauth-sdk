@@ -41,6 +41,16 @@ export interface ZevAuthClaims extends JWTPayload {
   org_id?: string;
   org_role?: string;
   org_permissions?: string[];
+  /**
+   * What the session must still do before it is fully trusted, e.g.
+   * `setup_mfa`. Absent when there is nothing, which is almost always.
+   */
+  pending_tasks?: string[];
+  /**
+   * How the session authenticated (RFC 8176). Present only on sessions
+   * that passed a second factor, and then includes `mfa`.
+   */
+  amr?: string[];
 }
 
 export interface VerifyOptions {

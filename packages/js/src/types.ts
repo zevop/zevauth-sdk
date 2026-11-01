@@ -125,6 +125,33 @@ export interface Branding {
   showPoweredBy: boolean;
 }
 
+/**
+ * The environment's organization policy, so a UI can draw only what the
+ * API will accept. The API enforces every rule regardless.
+ */
+/** What a sign-in screen needs to know about the app's two-step policy. */
+export interface MfaSettings {
+  /** `off`, `optional` or `required`. */
+  policy: 'off' | 'optional' | 'required';
+  /** Factor types people may set up, e.g. `totp`. */
+  factors: string[];
+  /** Days "remember this device" lasts. 0 means the app does not offer it. */
+  rememberDeviceDays: number;
+}
+
+export interface OrganizationSettings {
+  /** Organizations are turned on for this environment. */
+  enabled: boolean;
+  /** Signed-in people may create organizations themselves. */
+  creationAllowed: boolean;
+  /** Organizations have a URL slug. */
+  slugsEnabled: boolean;
+  /** Organizations may be deleted from the app (still needs `org:delete`). */
+  deleteAllowed: boolean;
+  /** How many organizations one person may have, or null for no limit. */
+  maxPerUser: number | null;
+}
+
 export interface EnvironmentConfig {
   id: string;
   kind: 'test' | 'live';
@@ -139,6 +166,12 @@ export interface EnvironmentConfig {
    * that sends a code and a screen that says "open the link" is a dead
    * end for whoever is holding the code.
    */
+  /** Absent from APIs older than this field. */
+  organizations?: OrganizationSettings;
+
+  /** Two-step verification policy. Absent from APIs older than this field. */
+  mfa?: MfaSettings;
+
   emailVerification?: {
     /** `at_signup` sends immediately; `later` waits for you; `never` skips it. */
     policy: 'at_signup' | 'later' | 'never';
@@ -173,11 +206,21 @@ export type Appearance = Partial<Omit<Branding, 'showPoweredBy' | 'appName'>>;
  *   zevid_denied    they chose not to continue on the consent screen
  *   zevid_rejected  ZevID answered, but with something we could not accept
  *   zevid_error     ZevID could not complete the sign-in
+ *   zevid_reauthentication_required
+ *                   a ZevID session reached its fresh-sign-in window
+ *   state_mismatch  a PKCE sign-in came back to a tab that did not start it
  *
  * `description` is written for the person and safe to show as-is.
  */
 export interface HandoffError {
-  code: 'zevid_expired' | 'zevid_denied' | 'zevid_rejected' | 'zevid_error' | (string & {});
+  code:
+    | 'zevid_expired'
+    | 'zevid_denied'
+    | 'zevid_rejected'
+    | 'zevid_error'
+    | 'zevid_reauthentication_required'
+    | 'state_mismatch'
+    | (string & {});
   description: string;
 }
 
@@ -191,7 +234,14 @@ export interface HandoffError {
 export interface UserSession {
   id: string;
   userAgent: string | null;
+  /**
+   * As much of the address as the developer allows end users to see:
+   * nothing (`ipDisplay: 'hidden'`, the default), the network only
+   * (`'coarse'`, e.g. `203.0.113.x`), or all of it (`'full'`).
+   */
   ipAddress: string | null;
+  /** Set in the console under the environment's sign-in settings. */
+  ipDisplay: 'hidden' | 'coarse' | 'full';
   /** How it started: `email_password`, `magic_link`, `zevid`, … */
   provider: string;
   createdAt: string;
@@ -206,7 +256,42 @@ export interface ZevAuthState {
   isLoaded: boolean;
   user: ZevAuthUser | null;
   organization: ActiveOrganization | null;
+  /**
+   * A sign-in waiting for its second factor: the first step succeeded
+   * and `signIn.verifySecondFactor({ code })` finishes it. Null (or
+   * absent, from an older client) otherwise.
+   */
+  secondFactor?: SecondFactorChallenge | null;
+  /**
+   * What the signed-in session must still do, e.g. `setup_mfa` when the
+   * app requires two-step verification and the person has none yet.
+   * Most of the API refuses the session until it is done.
+   */
+  pendingTasks?: SessionTask[];
 }
+
+/** Something a session must finish before it is fully trusted. */
+export type SessionTask = 'setup_mfa' | (string & {});
+
+/** The second step of a sign-in, as a UI needs it. */
+export interface SecondFactorChallenge {
+  /** What the person can enter: `totp`, `recovery_code`. */
+  factors: string[];
+  /** After this the person has to sign in again. ISO 8601. */
+  expiresAt: string;
+}
+
+/**
+ * What a sign-in call ended in. `complete` means a session started;
+ * `needs_second_factor` means the person has two-step verification and
+ * `signIn.verifySecondFactor({ code })` is next.
+ *
+ * Calls that used to return nothing now return this, so existing code
+ * that ignores the result keeps working.
+ */
+export type SignInResult =
+  | { status: 'complete' }
+  | ({ status: 'needs_second_factor' } & SecondFactorChallenge);
 
 export class ZevAuthError extends Error {
   constructor(

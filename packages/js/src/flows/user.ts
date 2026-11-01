@@ -7,6 +7,7 @@ import {
 } from '../types.js';
 import type { OrganizationMembership } from './organizations.js';
 import { uploadImage, type UploadImageOptions } from '../internal/upload.js';
+import type { MfaFlow } from './mfa.js';
 
 /**
  * The signed-in person, as the server sees them right now.
@@ -29,6 +30,8 @@ export class UserFlow {
      * refresh — up to fifteen minutes of the old name on screen.
      */
     private readonly onUserChanged: (user: ZevAuthUser) => void,
+    /** Two-step verification for this person: set up, remove, recovery codes. */
+    readonly mfa: MfaFlow,
   ) {}
 
   async fetch(): Promise<{
@@ -170,11 +173,16 @@ export class UserFlow {
     const accessToken = await this.getToken();
     if (!accessToken) return [];
 
-    const response = await this.http.get<{ sessions: UserSession[] }>(
-      '/v1/me/sessions',
-      { accessToken },
-    );
-    return response.sessions;
+    const response = await this.http.get<{
+      sessions: Array<Omit<UserSession, 'ipDisplay'>>;
+      ipDisplay?: UserSession['ipDisplay'];
+    }>('/v1/me/sessions', { accessToken });
+    /*
+     * Carried on each session so a row can label itself. An API older
+     * than the setting sends no mode and showed the full address.
+     */
+    const ipDisplay = response.ipDisplay ?? 'full';
+    return response.sessions.map((session) => ({ ...session, ipDisplay }));
   }
 
   /**

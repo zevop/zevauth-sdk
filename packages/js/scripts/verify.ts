@@ -62,7 +62,7 @@ interface Call {
 
 /** A fake API that records what it was asked, and can be told to fail. */
 function fakeApi(options: {
-  onRefresh?: (n: number, body: any) => 'ok' | 'reuse';
+  onRefresh?: (n: number, body: any) => 'ok' | 'reuse' | 'reauth';
   refreshDelayMs?: number;
   /**
    * Respond to refresh the way the real backend did for months: the
@@ -101,6 +101,15 @@ function fakeApi(options: {
 
       if (options.refreshDelayMs) {
         await new Promise((r) => setTimeout(r, options.refreshDelayMs));
+      }
+
+      if (verdict === 'reauth') {
+        return json(401, {
+          error: {
+            code: 'reauthentication_required',
+            message: 'Sign in with ZevID again to continue.',
+          },
+        });
       }
 
       if (verdict === 'reuse') {
@@ -202,6 +211,7 @@ function fakeApi(options: {
             createdAt: '2026-01-01T00:00:00.000Z', lastActiveAt: '2026-01-01T00:00:00.000Z',
             expiresAt: '2026-02-01T00:00:00.000Z', isCurrent: false },
         ],
+        ipDisplay: 'hidden',
       });
     }
 
@@ -530,6 +540,8 @@ async function main() {
     const sessions = await client.me.sessions();
     check('lists where they are signed in, current marked', sessions.length === 2 && sessions[0].isCurrent);
     check('with no token material in the shape', !sessions.some((s) => 'accessToken' in s || 'refreshToken' in s));
+    check('each session carries the IP display mode the API applied', sessions.every((s) => s.ipDisplay === 'hidden'));
+    check('an API that sends no organization policy reads as null, not as defaults', client.organizationSettings === null);
 
     await client.me.revokeSession('sess_phone');
     check('revoking another session sends DELETE for that id', api.calls.some((c) => c.method === 'DELETE' && c.path === '/v1/me/sessions/sess_phone'));
@@ -699,6 +711,231 @@ async function main() {
 
     delete (globalThis as any).location;
     delete (globalThis as any).history;
+  }
+
+  console.log('\n\x1b[1mZevID sign-in bound with PKCE\x1b[0m');
+
+  {
+    /*
+     * The ZevID team's leg 2 requirements: the code is bound to this
+     * tab's PKCE verifier and redirect, and the app's state comes back
+     * unchanged and is checked.
+     */
+    const store = new Map<string, string>();
+    (globalThis as any).sessionStorage = {
+      getItem: (k: string) => store.get(k) ?? null,
+      setItem: (k: string, v: string) => void store.set(k, v),
+      removeItem: (k: string) => void store.delete(k),
+    };
+    let assigned = '';
+    (globalThis as any).location = { get href() { return 'https://app.example.com/'; }, assign(to: string) { assigned = to; } };
+    const starter = new ZevAuth({ publishableKey: 'pk_test_abc', apiUrl: 'https://api.test', fetch: fakeApi().fetch, storage: memoryStorage() });
+    await starter.signIn.withZevId({ redirectUrl: 'https://app.example.com/callback', pkce: true });
+    const sent = new URL(assigned);
+    const state = sent.searchParams.get('state') ?? '';
+    check(
+      'pkce: true sends an S256 challenge and a state',
+      sent.searchParams.get('code_challenge_method') === 'S256' &&
+        /^[A-Za-z0-9_-]{43}$/.test(sent.searchParams.get('code_challenge') ?? '') &&
+        state.length > 0,
+      assigned,
+    );
+    check('and never the verifier', !assigned.includes('verifier'));
+
+    const api = fakeApi();
+    let href = `https://app.example.com/callback?code=hoc_abc&state=${state}&keep=1`;
+    (globalThis as any).location = { get href() { return href; }, assign() {} };
+    (globalThis as any).history = { replaceState: (_s: unknown, _t: string, url: string) => { href = url; } };
+    const { client } = makeClient(api);
+    await client.load();
+    const exchange = api.calls.find((c) => c.path === '/v1/auth/handoff/exchange');
+    check(
+      'the exchange proves the verifier and names the exact redirect',
+      typeof exchange?.body?.codeVerifier === 'string' &&
+        exchange.body.redirectUri === 'https://app.example.com/callback?keep=1',
+      JSON.stringify(exchange?.body),
+    );
+    check('and the code and our state leave the URL', !href.includes('code=') && !href.includes('state=') && href.includes('keep=1'), href);
+
+    // A response this tab did not ask for.
+    await starter.signIn.withZevId({ pkce: true });
+    const api2 = fakeApi();
+    href = 'https://app.example.com/callback?code=hoc_planted&state=someone-else';
+    (globalThis as any).location = { get href() { return href; }, assign() {} };
+    const planted = makeClient(api2).client;
+    await planted.load();
+    check(
+      'a state that does not match is refused before any exchange',
+      !api2.calls.some((c) => c.path === '/v1/auth/handoff/exchange') &&
+        planted.takeHandoffError()?.code === 'state_mismatch',
+    );
+
+    // Without PKCE, a page's own `state` is left alone.
+    const api3 = fakeApi();
+    href = 'https://app.example.com/callback?code=hoc_abc&state=page-owned';
+    await makeClient(api3).client.load();
+    check('a web exchange without PKCE sends just the code', JSON.stringify(api3.calls.find((c) => c.path === '/v1/auth/handoff/exchange')?.body) === '{"code":"hoc_abc"}');
+    check('and leaves a page’s own state in the URL', href.includes('state=page-owned'), href);
+
+    delete (globalThis as any).location;
+    delete (globalThis as any).history;
+    delete (globalThis as any).sessionStorage;
+  }
+
+  console.log('\n\x1b[1mA ZevID session past its fresh-sign-in window\x1b[0m');
+
+  {
+    const storage = memoryStorage();
+    const first = new ZevAuth({ publishableKey: 'pk_test_abc', apiUrl: 'https://api.test', fetch: fakeApi().fetch, storage });
+    await first.load();
+    await first.signIn.withPassword({ identifier: 'ada@example.com', password: 'pw' });
+
+    const reopened = new ZevAuth({
+      publishableKey: 'pk_test_abc', apiUrl: 'https://api.test',
+      fetch: fakeApi({ onRefresh: () => 'reauth' }).fetch, storage,
+    });
+    await reopened.load();
+    const handoff = reopened.takeHandoffError();
+    check('restoring it signs out', reopened.user === null);
+    check(
+      'and says why, where <SignIn> will show it',
+      handoff?.code === 'zevid_reauthentication_required',
+      JSON.stringify(handoff),
+    );
+  }
+
+  console.log('\n\x1b[1mTwo-step verification\x1b[0m');
+
+  {
+    /*
+     * A fake API for the MFA routes only. Sign-in answers with a
+     * challenge; the challenge is redeemed for a session that still has a
+     * `setup_mfa`-free state; enrollment refreshes the session.
+     */
+    const calls: Array<{ path: string; body: any; auth: string | null }> = [];
+    let refreshes = 0;
+    const session = (pendingTasks?: string[]) => ({
+      accessToken: `at_${calls.length}`,
+      refreshToken: `rt_${calls.length}`,
+      expiresIn: 900,
+      ...(pendingTasks ? { pendingTasks } : {}),
+    });
+    const fetchMfa = (async (url: string, init: RequestInit = {}) => {
+      const path = new URL(url).pathname;
+      const body = init.body ? JSON.parse(init.body as string) : undefined;
+      calls.push({ path, body, auth: (init.headers as Record<string, string>)?.Authorization ?? null });
+      const json = (status: number, payload: unknown) => new Response(JSON.stringify(payload), { status });
+      switch (path) {
+        case '/v1/environment':
+          return json(200, { id: 'env_test_x', kind: 'test', isTestMode: true, signInMethods: ['password'] });
+        case '/v1/auth/signin':
+          return json(200, {
+            status: 'needs_second_factor',
+            challenge: { id: 'chal_secret', factors: ['totp', 'recovery_code'], expiresAt: '2030-01-01T00:00:00Z' },
+          });
+        case '/v1/auth/mfa/verify':
+          if (body.code !== '123456') {
+            return json(401, { error: { code: 'mfa_code_invalid', message: 'That code is not valid. Try again.' } });
+          }
+          return json(200, { user: USER, session: session() });
+        case '/v1/auth/refresh':
+          refreshes++;
+          return json(200, { user: USER, session: session() });
+        case '/v1/me/mfa/totp':
+          return json(201, { factorId: 'fac_1', secret: 'JBSWY3DPEHPK3PXP', otpauthUri: 'otpauth://totp/x' });
+        case '/v1/me/mfa/totp/confirm':
+          return json(200, { factor: { id: 'fac_1', type: 'totp' }, recoveryCodes: ['AAAAA-BBBBB'] });
+        default:
+          return json(404, { error: { code: 'not_found', message: path } });
+      }
+    }) as unknown as typeof fetch;
+
+    const client = new ZevAuth({ publishableKey: 'pk_test_abc', apiUrl: 'https://api.test', fetch: fetchMfa, storage: memoryStorage() });
+    await client.load();
+    const states: any[] = [];
+    client.addListener((state) => states.push(state));
+
+    const first = await client.signIn.withPassword({ identifier: 'a@example.com', password: 'pw' });
+    check('a sign-in that needs a second factor says so', first.status === 'needs_second_factor');
+    check('and nobody is signed in yet', client.user === null);
+    check('the state carries what the UI needs, not the challenge id', states.at(-1)?.secondFactor?.factors?.join() === 'totp,recovery_code' && !JSON.stringify(states.at(-1)).includes('chal_secret'));
+
+    let wrong: unknown;
+    try {
+      await client.signIn.verifySecondFactor({ code: '000000' });
+    } catch (err) {
+      wrong = err;
+    }
+    check('a wrong code is a coded error', wrong instanceof ZevAuthError && (wrong as ZevAuthError).code === 'mfa_code_invalid');
+    check('and the challenge is kept for another try', client.secondFactor !== null);
+
+    const second = await client.signIn.verifySecondFactor({ code: '123456' });
+    const verifyCall = calls.find((c) => c.path === '/v1/auth/mfa/verify' && c.body.code === '123456');
+    check('the right code completes the sign-in', second.status === 'complete' && client.user?.id === USER.id);
+    check('using the challenge from the sign-in, with the publishable key', verifyCall?.body.challengeId === 'chal_secret' && verifyCall?.auth === 'Bearer pk_test_abc');
+    check('and the challenge is gone afterwards', client.secondFactor === null);
+
+    const enrollment = await client.me.mfa.startTotp();
+    check('enrollment returns the secret and the QR URI', enrollment.secret === 'JBSWY3DPEHPK3PXP' && enrollment.otpauthUri.startsWith('otpauth://'));
+    const before = refreshes;
+    const confirmed = await client.mfa.confirmTotp({ code: '123456' });
+    check('confirming returns the recovery codes once', confirmed.recoveryCodes.length === 1);
+    check('and refreshes the session so a setup task clears at once', refreshes === before + 1);
+  }
+
+  {
+    /*
+     * Remembered devices. The token comes back from verify only when the
+     * person asked and the app allows it; the client keeps it and sends
+     * it on sign-in routes, and nowhere else.
+     */
+    const seen: Array<{ path: string; device: string | null }> = [];
+    const storage = memoryStorage();
+    const fetchDevice = (async (url: string, init: RequestInit = {}) => {
+      const path = new URL(url).pathname;
+      const headers = (init.headers ?? {}) as Record<string, string>;
+      seen.push({ path, device: headers['X-Zevauth-Device'] ?? null });
+      const json = (payload: unknown) => new Response(JSON.stringify(payload), { status: 200 });
+      if (path === '/v1/environment') return json({ id: 'env_test_x', kind: 'test', isTestMode: true, signInMethods: ['password'] });
+      if (path === '/v1/auth/signin') {
+        return json({ status: 'needs_second_factor', challenge: { id: 'chal', factors: ['totp'], expiresAt: '2030-01-01T00:00:00Z' } });
+      }
+      if (path === '/v1/auth/mfa/verify') {
+        return json({
+          user: USER,
+          session: { accessToken: 'a', refreshToken: 'r', expiresIn: 900 },
+          trustedDevice: { token: 'mfd_kept', expiresAt: '2030-01-01T00:00:00Z' },
+        });
+      }
+      return json({});
+    }) as unknown as typeof fetch;
+    const client = new ZevAuth({ publishableKey: 'pk_test_abc', apiUrl: 'https://api.test', fetch: fetchDevice, storage });
+    await client.load();
+    await client.signIn.withPassword({ identifier: 'a@example.com', password: 'pw' });
+    check('no device token is sent before one was issued', seen.find((c) => c.path === '/v1/auth/signin')?.device === null);
+    await client.signIn.verifySecondFactor({ code: '123456', rememberDevice: true });
+    await client.signOut();
+    seen.length = 0;
+    await client.signIn.withPassword({ identifier: 'a@example.com', password: 'pw' });
+    check('a remembered device is sent at the next sign-in, after signing out', seen.find((c) => c.path === '/v1/auth/signin')?.device === 'mfd_kept');
+    check('and never to the environment route', seen.filter((c) => c.path === '/v1/environment').every((c) => c.device === null));
+  }
+
+  {
+    // A session that must set up MFA says so on state.
+    const fetchTask = (async (url: string) => {
+      const path = new URL(url).pathname;
+      const json = (payload: unknown) => new Response(JSON.stringify(payload), { status: 200 });
+      if (path === '/v1/environment') return json({ id: 'env_test_x', kind: 'test', isTestMode: true, signInMethods: ['password'] });
+      return json({ user: USER, session: { accessToken: 'a', refreshToken: 'r', expiresIn: 900, pendingTasks: ['setup_mfa'] } });
+    }) as unknown as typeof fetch;
+    const client = new ZevAuth({ publishableKey: 'pk_test_abc', apiUrl: 'https://api.test', fetch: fetchTask, storage: memoryStorage() });
+    await client.load();
+    const result = await client.signIn.withPassword({ identifier: 'a@example.com', password: 'pw' });
+    check('a session with a pending task is still a completed sign-in', result.status === 'complete' && client.user !== null);
+    check('and exposes the task', client.pendingTasks.join() === 'setup_mfa');
+    await client.signOut();
+    check('signing out clears it', client.pendingTasks.length === 0);
   }
 
   console.log(

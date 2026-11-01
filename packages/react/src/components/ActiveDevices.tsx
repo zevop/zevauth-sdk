@@ -75,7 +75,17 @@ export function ActiveDevices({ client }: { client: ZevAuth }) {
                     {session.isCurrent ? <span {...el('badge')}>{t.thisDevice}</span> : null}
                   </div>
                   <div className="zv-menu-sub">
-                    {[session.ipAddress, format(t.lastActive, { time: relativeTime(session.lastActiveAt) })]
+                    {[
+                      /*
+                       * As much as the developer chose to show, decided
+                       * by the API: nothing, a network marked as
+                       * approximate, or the address.
+                       */
+                      session.ipAddress && session.ipDisplay === 'coarse'
+                        ? format(t.approximateIp, { ip: session.ipAddress })
+                        : session.ipAddress,
+                      format(t.lastActive, { time: relativeTime(session.lastActiveAt) }),
+                    ]
                       .filter(Boolean)
                       .join(' · ')}
                   </div>
