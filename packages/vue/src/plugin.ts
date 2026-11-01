@@ -10,6 +10,7 @@ import {
   createZevAuthUI,
   type Appearance,
   type Localization,
+  type SessionBridgeOptions,
   type ZevAuth,
   type ZevAuthState,
   type ZevAuthUI,
@@ -25,6 +26,12 @@ export interface ZevAuthPluginOptions {
   appearance?: Appearance;
   /** The words every ZevAuth component prints. */
   localization?: Localization;
+  /**
+   * For server-rendered pages: post every new access token to your own
+   * server, which keeps it in an HttpOnly cookie. See the session bridge
+   * in the docs.
+   */
+  sessionBridge?: SessionBridgeOptions;
 }
 
 export interface ZevAuthContext {
@@ -98,7 +105,7 @@ export function createZevAuth(options: ZevAuthPluginOptions) {
           if (!options.publishableKey) {
             throw new Error('createZevAuth needs a publishableKey, or a client to use instead.');
           }
-          return createClient({ publishableKey: options.publishableKey, apiUrl: options.apiUrl });
+          return createClient({ publishableKey: options.publishableKey, apiUrl: options.apiUrl, sessionBridge: options.sessionBridge });
         })();
 
       shareLoad(client);

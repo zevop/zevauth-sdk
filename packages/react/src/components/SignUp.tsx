@@ -201,8 +201,17 @@ export function SignUp({
                   event.preventDefault();
                   setError(null);
                   setIsBusy(true);
+                  /*
+                   * Confirming the address returns no session, and this
+                   * used to stop there: a correct code, a spinner, and the
+                   * same screen with no way forward. The person typed their
+                   * password a moment ago in this form, so sign them in
+                   * with it. A second step, if they need one, takes over
+                   * through the client state like any other sign-in.
+                   */
                   client.signUp
                     .verifyCode({ email, code })
+                    .then(() => client.signIn.withPassword({ identifier: email, password }))
                     .catch((err: unknown) =>
                       setError(
                         err instanceof ZevAuthError

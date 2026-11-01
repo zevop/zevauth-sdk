@@ -11,7 +11,7 @@
     "backend"
   ],
   "license": "MIT",
-  "author": "ZevOp",
+  "author": "ZevOp Inc.",
   "homepage": "https://docs.zevauth.com",
   "repository": {
     "type": "git",
@@ -34,11 +34,20 @@
       "types": "./dist/verify.d.ts",
       "import": "./dist/verify.js"
     },
+    "./bridge": {
+      "types": "./dist/bridge.d.ts",
+      "import": "./dist/bridge.js"
+    },
+    "./webhooks": {
+      "types": "./dist/webhooks.d.ts",
+      "import": "./dist/webhooks.js"
+    },
     "./package.json": "./package.json"
   },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "sideEffects": false,
   "engines": {
@@ -48,9 +57,9 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsc -b",
+    "build": "node scripts/write-version.mjs && tsc -b",
     "typecheck": "tsc -b",
-    "verify": "tsx scripts/verify.ts"
+    "verify": "tsx scripts/verify.ts && tsx scripts/conformance.ts"
   },
   "dependencies": {
     "jose": "^6.1.0"

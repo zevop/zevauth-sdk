@@ -1,4 +1,4 @@
-export { ZevAuth, type ZevAuthOptions } from './client.js';
+export { ZevAuth, type ZevAuthOptions, type IncomingUrlResult } from './client.js';
 export { SignInFlow } from './flows/sign-in.js';
 export { SignUpFlow } from './flows/sign-up.js';
 export { PasswordResetFlow } from './flows/password-reset.js';
@@ -31,6 +31,8 @@ export {
   type ZevAuthUser,
 } from './types.js';
 export type { SessionStorageAdapter } from './internal/tokens.js';
+export type { AsyncSessionStorageAdapter, CryptoAdapter } from './internal/native.js';
+export type { SessionBridgeOptions } from './internal/session-bridge.js';
 export type {
   AssetPurpose,
   UploadImageOptions,

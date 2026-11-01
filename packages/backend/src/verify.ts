@@ -23,9 +23,10 @@
  * leaves the rest out of the bundle, so the warning goes away because
  * the code does.
  */
-import { createRemoteJWKSet } from 'jose/jwks/remote';
+import { createRemoteJWKSet, customFetch } from 'jose/jwks/remote';
+import { createLocalJWKSet } from 'jose/jwks/local';
 import { jwtVerify } from 'jose/jwt/verify';
-import type { JWTPayload } from 'jose';
+import type { JSONWebKeySet, JWTPayload } from 'jose';
 
 /**
  * Verifying a ZevAuth token on the server, without calling ZevAuth.
@@ -78,6 +79,93 @@ export interface VerifyOptions {
    * discovery document, which is where the server publishes it.
    */
   issuer?: string;
+  /**
+   * Seconds of clock difference tolerated on `exp` and `nbf`. Defaults
+   * to 5, the value every ZevAuth server SDK uses (spec/SERVER_SDK.md).
+   */
+  clockSkewSeconds?: number;
+  /**
+   * A key set to use instead of fetching one. For tests and for servers
+   * that cannot reach the API at runtime; `issuer` is then required.
+   */
+  jwks?: JSONWebKeySet;
+  /** The time to verify against. For tests; defaults to now. */
+  currentDate?: Date;
+  /**
+   * The `fetch` used for discovery and key sets. For tests, and for
+   * runtimes that need a configured client (a proxy, custom CA).
+   */
+  fetch?: typeof fetch;
+  /**
+   * The shortest gap between two key-set refetches triggered by an
+   * unknown `kid`, in seconds. Defaults to 30. A token with a made-up
+   * `kid` must not be able to make us fetch on every request.
+   */
+  jwksCooldownSeconds?: number;
+}
+
+/**
+ * Why a token was refused, in the same words in every ZevAuth server
+ * SDK. `getAuth` treats them all as signed out; they exist for logs and
+ * for anybody calling `verifyZevAuthToken` directly.
+ */
+export type VerifyErrorCode =
+  | 'token_expired'
+  | 'token_not_yet_valid'
+  | 'unsupported_algorithm'
+  | 'invalid_issuer'
+  | 'invalid_audience'
+  | 'unknown_key'
+  | 'invalid_signature'
+  | 'malformed_token'
+  | 'jwks_unavailable';
+
+export class ZevAuthVerifyError extends Error {
+  constructor(
+    message: string,
+    readonly code: VerifyErrorCode,
+  ) {
+    super(message);
+    this.name = 'ZevAuthVerifyError';
+  }
+}
+
+/** The one algorithm ZevAuth signs with. Anything else is refused. */
+const ALGORITHMS = ['RS256'];
+const DEFAULT_SKEW_SECONDS = 5;
+
+/**
+ * jose's errors, in our vocabulary.
+ *
+ * Mapped by the error's `code` and, for claim failures, the claim name,
+ * because those are jose's documented contract; its messages are not.
+ */
+function toVerifyError(error: unknown): ZevAuthVerifyError {
+  if (error instanceof ZevAuthVerifyError) return error;
+  const e = error as { code?: string; claim?: string; message?: string };
+  const message = e?.message ?? 'The token could not be verified.';
+  switch (e?.code) {
+    case 'ERR_JWT_EXPIRED':
+      return new ZevAuthVerifyError(message, 'token_expired');
+    case 'ERR_JWT_CLAIM_VALIDATION_FAILED':
+      if (e.claim === 'nbf') return new ZevAuthVerifyError(message, 'token_not_yet_valid');
+      if (e.claim === 'iss') return new ZevAuthVerifyError(message, 'invalid_issuer');
+      if (e.claim === 'aud') return new ZevAuthVerifyError(message, 'invalid_audience');
+      return new ZevAuthVerifyError(message, 'malformed_token');
+    case 'ERR_JOSE_ALG_NOT_ALLOWED':
+    case 'ERR_JOSE_NOT_SUPPORTED':
+      return new ZevAuthVerifyError(message, 'unsupported_algorithm');
+    case 'ERR_JWKS_NO_MATCHING_KEY':
+    case 'ERR_JWKS_MULTIPLE_MATCHING_KEYS':
+      return new ZevAuthVerifyError(message, 'unknown_key');
+    case 'ERR_JWS_SIGNATURE_VERIFICATION_FAILED':
+      return new ZevAuthVerifyError(message, 'invalid_signature');
+    case 'ERR_JWKS_TIMEOUT':
+    case 'ERR_JWKS_INVALID':
+      return new ZevAuthVerifyError(message, 'jwks_unavailable');
+    default:
+      return new ZevAuthVerifyError(message, 'malformed_token');
+  }
 }
 
 /**
@@ -103,8 +191,13 @@ interface Discovered {
 
 const discovered = new Map<string, Promise<Discovered>>();
 
-function discover(environmentId: string, apiUrl: string): Promise<Discovered> {
-  const cacheKey = `${apiUrl}|${environmentId}`;
+function discover(
+  environmentId: string,
+  apiUrl: string,
+  doFetch: typeof fetch = globalThis.fetch,
+  cooldownSeconds = 30,
+): Promise<Discovered> {
+  const cacheKey = `${apiUrl}|${environmentId}|${cooldownSeconds}`;
   const existing = discovered.get(cacheKey);
   if (existing) return existing;
 
@@ -113,14 +206,23 @@ function discover(environmentId: string, apiUrl: string): Promise<Discovered> {
    * share one fetch instead of each starting their own.
    */
   const pending = (async (): Promise<Discovered> => {
-    const response = await fetch(
-      `${apiUrl}/v1/${environmentId}/.well-known/openid-configuration`,
-    );
+    let response: Response;
+    try {
+      response = await doFetch(
+        `${apiUrl}/v1/${environmentId}/.well-known/openid-configuration`,
+      );
+    } catch (error) {
+      throw new ZevAuthVerifyError(
+        `Could not reach ZevAuth to read the discovery document: ${String(error)}`,
+        'jwks_unavailable',
+      );
+    }
 
     if (!response.ok) {
-      throw new Error(
+      throw new ZevAuthVerifyError(
         `Could not read the ZevAuth discovery document for ${environmentId} ` +
           `(${response.status}). Check the environment id and apiUrl.`,
+        'jwks_unavailable',
       );
     }
 
@@ -136,7 +238,13 @@ function discover(environmentId: string, apiUrl: string): Promise<Discovered> {
        * unknown `kid`, which is what a key rotation looks like. Building
        * one per request would defeat that and fetch on every page view.
        */
-      keys: createRemoteJWKSet(new URL(document.jwks_uri)),
+      keys: createRemoteJWKSet(new URL(document.jwks_uri), {
+        cooldownDuration: cooldownSeconds * 1000,
+        cacheMaxAge: 10 * 60 * 1000,
+        ...(doFetch !== globalThis.fetch
+          ? { [customFetch]: (url: string, init: RequestInit) => doFetch(url, init) }
+          : {}),
+      }),
     };
   })();
 
@@ -160,15 +268,34 @@ export async function verifyZevAuthToken(
   token: string,
   options: VerifyOptions,
 ): Promise<ZevAuthClaims> {
-  const apiUrl = options.apiUrl ?? 'https://api.zevauth.net';
-  const { issuer, keys } = await discover(options.environmentId, apiUrl);
+  let issuer: string;
+  let keys: Parameters<typeof jwtVerify>[1];
 
-  const { payload } = await jwtVerify(token, keys, {
-    issuer: options.issuer ?? issuer,
-    audience: options.environmentId,
-  });
+  if (options.jwks) {
+    if (!options.issuer) {
+      throw new Error('verifyZevAuthToken: `issuer` is required when `jwks` is given.');
+    }
+    issuer = options.issuer;
+    keys = createLocalJWKSet(options.jwks) as Parameters<typeof jwtVerify>[1];
+  } else {
+    const apiUrl = options.apiUrl ?? 'https://api.zevauth.net';
+    const found = await discover(options.environmentId, apiUrl, options.fetch, options.jwksCooldownSeconds);
+    issuer = options.issuer ?? found.issuer;
+    keys = found.keys as Parameters<typeof jwtVerify>[1];
+  }
 
-  return payload as ZevAuthClaims;
+  try {
+    const { payload } = await jwtVerify(token, keys as never, {
+      issuer,
+      audience: options.environmentId,
+      algorithms: ALGORITHMS,
+      clockTolerance: options.clockSkewSeconds ?? DEFAULT_SKEW_SECONDS,
+      ...(options.currentDate ? { currentDate: options.currentDate } : {}),
+    });
+    return payload as ZevAuthClaims;
+  } catch (error) {
+    throw toVerifyError(error);
+  }
 }
 
 /** Pulls the bearer token out of an `Authorization` header. */
@@ -187,10 +314,8 @@ export function bearerFrom(headerValue: string | null | undefined): string | nul
 }
 
 
-export interface ZevAuthServerConfig {
-  environmentId: string;
-  apiUrl?: string;
-}
+/** The verify options; every field but `environmentId` is optional. */
+export type ZevAuthServerConfig = VerifyOptions;
 
 export interface ServerAuth {
   isSignedIn: boolean;

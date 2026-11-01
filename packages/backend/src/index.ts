@@ -5,6 +5,19 @@ import { Organizations } from './organizations.js';
 import { ZevAuthError } from './errors.js';
 
 export { ZevAuthError } from './errors.js';
+/*
+ * Webhook verification sits with the admin client because both run on
+ * the developer's server with a secret. Also at `@zevauth/backend/webhooks`
+ * for routes that only receive webhooks.
+ */
+export {
+  verifyWebhook,
+  constructWebhookEvent,
+  ZevAuthWebhookError,
+  type VerifyWebhookParams,
+  type WebhookErrorCode,
+  type ZevAuthWebhookEvent,
+} from './webhooks.js';
 export { Users, type CreateUserParams, type UpdateUserParams } from './users.js';
 export { Organizations } from './organizations.js';
 export {

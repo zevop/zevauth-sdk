@@ -1,0 +1,19 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "jsx": "react-jsx",
+    "composite": true,
+    /*
+     * The React Native and Expo module types come from small ambient
+     * declarations (src/native-modules.d.ts), not from installing React
+     * Native into this workspace: the package only uses a handful of
+     * long-stable APIs, and pulling RN's toolchain into an npm workspace
+     * of web packages would slow and destabilise every install.
+     */
+    "skipLibCheck": true
+  },
+  "references": [{ "path": "../js" }, { "path": "../react" }],
+  "include": ["src"]
+}

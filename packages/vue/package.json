@@ -12,7 +12,7 @@
     "components"
   ],
   "license": "MIT",
-  "author": "ZevOp",
+  "author": "ZevOp Inc.",
   "homepage": "https://docs.zevauth.com",
   "repository": {
     "type": "git",
@@ -35,7 +35,8 @@
   },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "sideEffects": false,
   "engines": {

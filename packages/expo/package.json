@@ -1,0 +1,73 @@
+{
+  "name": "@zevauth/expo",
+  "version": "0.1.0",
+  "description": "ZevAuth for Expo and React Native: hooks and native sign-in components.",
+  "keywords": [
+    "zevauth",
+    "authentication",
+    "auth",
+    "expo",
+    "react-native",
+    "mobile",
+    "sso"
+  ],
+  "license": "MIT",
+  "author": "ZevOp Inc.",
+  "homepage": "https://docs.zevauth.com/sdk/expo",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zevop/zevauth-sdk.git",
+    "directory": "packages/expo"
+  },
+  "bugs": {
+    "url": "https://github.com/zevop/zevauth-sdk/issues"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "react-native": "./dist/index.js",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "react-native": "./dist/index.js",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b",
+    "verify": "node --import ./scripts/register-mocks.mjs --import tsx scripts/verify.tsx"
+  },
+  "peerDependencies": {
+    "expo-crypto": ">=56",
+    "expo-secure-store": ">=56",
+    "expo-web-browser": ">=56",
+    "react": ">=18",
+    "react-native": ">=0.76"
+  },
+  "dependencies": {
+    "@zevauth/js": "^0.2.7",
+    "@zevauth/react": "^0.2.7"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.14",
+    "react": "^19.2.4",
+    "react-test-renderer": "^19.2.4",
+    "tsx": "^4.20.6",
+    "typescript": "~5.9.0"
+  }
+}

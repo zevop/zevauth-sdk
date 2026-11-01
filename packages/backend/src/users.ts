@@ -126,6 +126,31 @@ export class Users {
   }
 
   /**
+   * Turns off two-step verification for somebody who lost their device,
+   * after you have confirmed who they are. `revokeSessions` also signs
+   * them out everywhere; it defaults to false, as the API does.
+   */
+  resetMfa(userId: string, options: { revokeSessions?: boolean } = {}) {
+    const query = options.revokeSessions ? '?revokeSessions=true' : '';
+    return this.http.delete<unknown>(`/v1/users/${encodeURIComponent(userId)}/mfa${query}`);
+  }
+
+  /**
+   * Every user matching `params`, a page at a time, following `next`
+   * until there are no more. For a nightly job:
+   *
+   *   for await (const user of zevauth.users.iterate()) { … }
+   */
+  async *iterate(params: Omit<Parameters<Users['list']>[0] & object, 'after'> = {}): AsyncGenerator<ZevAuthUser> {
+    let after: string | undefined;
+    do {
+      const page = await this.list({ ...params, after });
+      yield* page.data;
+      after = page.hasMore && page.next ? page.next : undefined;
+    } while (after);
+  }
+
+  /**
    * Deletes a user and everything attached to them.
    *
    * A real delete, not a flag: somebody exercising a right to erasure is

@@ -152,6 +152,17 @@ function fakeApi(options: {
       });
     }
 
+    if (path === '/v1/auth/magic-link/verify') {
+      if (body?.token !== 'good-link') {
+        return json(400, { error: { code: 'link_invalid', message: 'That link has expired.' } });
+      }
+      issued++;
+      return json(200, {
+        user: USER,
+        session: { accessToken: `at_${issued}`, refreshToken: `rt_${issued}`, expiresIn: 900, organization: null },
+      });
+    }
+
     if (path === '/v1/auth/magic-link' || path === '/v1/auth/password-reset') {
       // Deliberately identical whether or not the address is known.
       return json(200, {
@@ -308,6 +319,58 @@ async function main() {
     check('concurrent loads share one run', fetches === 1, `${fetches} environment fetches`);
     await client.load();
     check('and a load after it finished does nothing', api.calls.filter((c) => c.path === '/v1/environment').length === 1);
+  }
+
+  console.log('\n\x1b[1mSession bridge\x1b[0m');
+
+  {
+    /*
+     * Server-rendered apps: every token change is posted to the
+     * developer's endpoint, in order, with the CSRF header; a first load
+     * with no session posts nothing.
+     */
+    const api = fakeApi();
+    const posts: Array<{ token: string | null; header: string | null; credentials?: string }> = [];
+    const fetchWithBridge = (async (url: string, init: RequestInit = {}) => {
+      if (String(url).endsWith('/zevauth/session')) {
+        posts.push({
+          token: JSON.parse(init.body as string).token,
+          header: (init.headers as Record<string, string>)['x-zevauth-bridge'] ?? null,
+          credentials: init.credentials,
+        });
+        return new Response(null, { status: 204 });
+      }
+      return api.fetch(url, init);
+    }) as typeof fetch;
+    const client = new ZevAuth({
+      publishableKey: 'pk_test_abc',
+      apiUrl: 'https://api.test',
+      fetch: fetchWithBridge,
+      storage: memoryStorage(),
+      sessionBridge: { url: '/zevauth/session' },
+    });
+    await client.load();
+    await client.syncSessionBridge().catch(() => {});
+    const afterLoad = posts.length;
+    check('a signed-out first load posts only when asked to (the handshake)', afterLoad === 1 && posts[0].token === null);
+
+    await client.signIn.withPassword({ identifier: 'a@example.com', password: 'hunter2hunter2' });
+    await client.syncSessionBridge();
+    const signedIn = posts.slice(afterLoad).find((p) => p.token);
+    check('signing in posts the access token', Boolean(signedIn?.token?.startsWith('at_')));
+    check('with the CSRF header and the page cookies', signedIn?.header === '1' && signedIn?.credentials === 'include');
+    check('and never the refresh token', posts.every((p) => !p.token?.startsWith('rt_')));
+
+    const beforeSignOut = posts.length;
+    await client.signOut();
+    await client.syncSessionBridge();
+    check('signing out posts a clear', posts.slice(beforeSignOut).some((p) => p.token === null));
+
+    const quiet = new ZevAuth({ publishableKey: 'pk_test_abc', apiUrl: 'https://api.test', fetch: fetchWithBridge, storage: memoryStorage(), sessionBridge: { url: '/zevauth/session' } });
+    const count = posts.length;
+    await quiet.load();
+    await new Promise((r) => setTimeout(r, 10));
+    check('a signed-out visitor costs the server no request', posts.length === count);
   }
 
   console.log('\n\x1b[1mSign in and session\x1b[0m');
@@ -936,6 +999,83 @@ async function main() {
     check('and exposes the task', client.pendingTasks.join() === 'setup_mfa');
     await client.signOut();
     check('signing out clears it', client.pendingTasks.length === 0);
+  }
+
+  console.log('\n\x1b[1mNative apps: async storage, deep links, PKCE\x1b[0m');
+
+  {
+    // An async store (the keychain, via expo-secure-store) holding a session.
+    const backing = new Map<string, string>([
+      ['zevauth.session.test', JSON.stringify({ refreshToken: 'rt_saved', expiresAt: 0, user: USER, organization: null })],
+    ]);
+    const writes: string[] = [];
+    const asyncStorage = {
+      get: async (k: string) => backing.get(k) ?? null,
+      set: async (k: string, v: string) => { writes.push(k); backing.set(k, v); },
+      remove: async (k: string) => { backing.delete(k); },
+    };
+    const api = fakeApi();
+    const client = new ZevAuth({ publishableKey: 'pk_test_abc', apiUrl: 'https://api.test', fetch: api.fetch, asyncStorage });
+    await client.load();
+    check('an async store is read before the session is restored', client.user?.id === USER.id && api.refreshCount === 1);
+    await client.flushStorage();
+    check('and the rotated token is written back to it', JSON.parse(backing.get('zevauth.session.test') ?? '{}').refreshToken === 'rt_1');
+
+    await client.signOut();
+    await client.flushStorage();
+    check('signing out removes it from the async store', !backing.has('zevauth.session.test'));
+  }
+
+  {
+    const api = fakeApi();
+    const { client } = makeClient(api);
+    const fixed = new Uint8Array(32).fill(7);
+    const crypto = {
+      getRandomValues: (b: Uint8Array) => { b.set(fixed.subarray(0, b.length)); return b; },
+      sha256: async (input: string) => new Uint8Array(32).fill(input.length),
+    };
+    const native = new ZevAuth({ publishableKey: 'pk_test_abc', apiUrl: 'https://api.test', fetch: api.fetch, storage: memoryStorage(), crypto });
+    const url = await native.createZevIdAuthorizationUrl({ redirectUrl: 'https://acme.example/auth/callback' });
+    check('the native ZevID URL carries an S256 challenge, a state and the redirect',
+      url.startsWith('https://api.test/v1/auth/zevid/start?') && url.includes('code_challenge_method=S256') &&
+      url.includes('code_challenge=') && url.includes('state=') && url.includes('redirect_url=https%3A%2F%2Facme.example%2Fauth%2Fcallback'));
+    const state = decodeURIComponent(/state=([^&]+)/.exec(url)?.[1] ?? '');
+
+    const wrong = await native.handleIncomingUrl('https://acme.example/auth/callback?code=hoc_x&state=someone-else');
+    check('a code with a different state is refused, without being exchanged',
+      wrong.status === 'error' && wrong.error.code === 'state_mismatch' &&
+      !api.calls.some((c) => c.path === '/v1/auth/handoff/exchange'));
+
+    await native.createZevIdAuthorizationUrl({ redirectUrl: 'https://acme.example/auth/callback' });
+    const ok = await native.handleIncomingUrl(`https://acme.example/auth/callback?code=hoc_x&state=${encodeURIComponent(state)}`);
+    const exchange = api.calls.find((c) => c.path === '/v1/auth/handoff/exchange');
+    check('the matching return is exchanged with the verifier and the exact redirect',
+      ok.status === 'complete' && typeof exchange?.body?.codeVerifier === 'string' &&
+      exchange?.body?.redirectUri === 'https://acme.example/auth/callback');
+
+    const denied = await native.handleIncomingUrl('myapp://callback?error=zevid_denied&error_description=You%20chose%20not%20to%20continue.&state=x');
+    check('a failed sign-in comes back as an error the app can show',
+      denied.status === 'error' && denied.error.description === 'You chose not to continue.');
+
+    const magic = await client.handleIncomingUrl('https://acme.example/sign-in?zv_token=good-link&zv_flow=sign-in');
+    check('a sign-in link opened in the app signs in', magic.status === 'complete' && client.user?.id === USER.id);
+    const stale = await client.handleIncomingUrl('https://acme.example/sign-in?zv_token=old&zv_flow=sign-in');
+    check('and a used link says so instead of throwing', stale.status === 'error');
+    check('links that are not ours are ignored', (await client.handleIncomingUrl('https://acme.example/settings')).status === 'ignored');
+  }
+
+  {
+    // Foreground resume: a revoked session is signed out, a network blip is not.
+    const api = fakeApi({ onRefresh: (n) => (n === 1 ? 'ok' : 'reuse') });
+    const storage = memoryStorage();
+    storage.set('zevauth.session.test', JSON.stringify({ refreshToken: 'rt_saved', expiresAt: 0, user: USER, organization: null }));
+    const { client } = makeClient(api, storage);
+    await client.load();
+    storage.set('zevauth.session.test', JSON.stringify({ ...JSON.parse(storage.get('zevauth.session.test')!), expiresAt: 0 }));
+    let told = 0;
+    client.addListener(() => told++);
+    await client.revalidate();
+    check('coming back to the foreground with a dead session signs out', client.user === null && told > 0);
   }
 
   console.log(

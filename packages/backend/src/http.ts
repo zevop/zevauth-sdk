@@ -1,3 +1,4 @@
+import { VERSION } from './version.js';
 import { ZevAuthError } from './errors.js';
 
 export interface HttpOptions {
@@ -59,9 +60,11 @@ export class Http {
   ): Promise<T> {
     const doFetch = this.options.fetch ?? globalThis.fetch;
     let lastError: unknown;
+    let retryAfterMs: number | null = null;
 
     for (let attempt = 0; attempt <= this.options.maxRetries; attempt++) {
-      if (attempt > 0) await sleep(backoffMs(attempt));
+      if (attempt > 0) await sleep(retryAfterMs ?? backoffMs(attempt));
+      retryAfterMs = null;
 
       const controller = new AbortController();
       const timer = setTimeout(
@@ -75,6 +78,8 @@ export class Http {
           headers: {
             'content-type': 'application/json',
             authorization: `Bearer ${this.options.secretKey}`,
+            // So ZevAuth support can tell which SDK and version made a call.
+            'user-agent': `zevauth-node/${VERSION}`,
           },
           body: body === undefined ? undefined : JSON.stringify(body),
           signal: controller.signal,
@@ -86,11 +91,13 @@ export class Http {
         const parsed = text ? safeJson(text) : undefined;
 
         if (!response.ok) {
+          const requestId = response.headers?.get?.('x-request-id') ?? undefined;
           if (isRetryableStatus(response.status) && attempt < this.options.maxRetries) {
-            lastError = errorFrom(response.status, parsed);
+            lastError = errorFrom(response.status, parsed, requestId);
+            retryAfterMs = retryAfter(response.headers?.get?.('retry-after') ?? null);
             continue;
           }
-          throw errorFrom(response.status, parsed);
+          throw errorFrom(response.status, parsed, requestId);
         }
 
         return parsed as T;
@@ -144,7 +151,17 @@ function safeJson(text: string): unknown {
   }
 }
 
-function errorFrom(status: number, body: unknown): ZevAuthError {
+/**
+ * The server's `Retry-After`, in milliseconds, capped at 10 seconds: a
+ * longer wait belongs to the caller, not to a request they are awaiting.
+ */
+function retryAfter(header: string | null): number | null {
+  const seconds = Number(header);
+  if (!header || !Number.isFinite(seconds) || seconds < 0) return null;
+  return Math.min(seconds * 1000, 10_000);
+}
+
+function errorFrom(status: number, body: unknown, requestId?: string): ZevAuthError {
   const envelope = body as
     | { error?: { code?: string; message?: string }; message?: string }
     | undefined;
@@ -155,6 +172,7 @@ function errorFrom(status: number, body: unknown): ZevAuthError {
       `ZevAuth returned ${status}.`,
     envelope?.error?.code ?? 'request_failed',
     status,
+    requestId,
   );
 }
 

@@ -1,7 +1,7 @@
 import { useSyncExternalStore, type ComponentType } from 'react';
 import { createPortal } from 'react-dom';
 import { createRoot, type Root } from 'react-dom/client';
-import { createZevAuth, type ZevAuth } from '@zevauth/js';
+import { createZevAuth, type SessionBridgeOptions, type ZevAuth } from '@zevauth/js';
 import {
   OrganizationProfile,
   OrganizationSwitcher,
@@ -44,6 +44,7 @@ export type {
   ActiveOrganization,
   OrganizationMember,
   OrganizationMembership,
+  SessionBridgeOptions,
   ZevAuth,
 } from '@zevauth/js';
 /*
@@ -66,6 +67,12 @@ export interface ZevAuthUIOptions {
   appearance?: Appearance;
   /** The words every mounted component prints. */
   localization?: Localization;
+  /**
+   * For server-rendered pages: post every new access token to your own
+   * server, which keeps it in an HttpOnly cookie. See the session bridge
+   * in the docs.
+   */
+  sessionBridge?: SessionBridgeOptions;
 }
 
 /**
@@ -135,7 +142,7 @@ export function createZevAuthUI(options: ZevAuthUIOptions): ZevAuthUI {
       if (!options.publishableKey) {
         throw new Error('createZevAuthUI needs a publishableKey, or a client to use instead.');
       }
-      return createZevAuth({ publishableKey: options.publishableKey, apiUrl: options.apiUrl });
+      return createZevAuth({ publishableKey: options.publishableKey, apiUrl: options.apiUrl, sessionBridge: options.sessionBridge });
     })();
 
   let mounts: Mount[] = [];

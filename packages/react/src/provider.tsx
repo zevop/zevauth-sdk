@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { createZevAuth, type ZevAuth, type ZevAuthState } from '@zevauth/js';
+import { createZevAuth, type SessionBridgeOptions, type ZevAuth, type ZevAuthState } from '@zevauth/js';
 import { ZevAuthContext, mergeAppearance } from './internal/context.js';
 import type { Appearance } from './internal/appearance.js';
 import type { Localization } from './internal/localization.js';
@@ -9,6 +9,12 @@ export interface ZevAuthProviderProps {
   /** An already-constructed client. Useful for tests and for SSR setups. */
   client?: ZevAuth;
   apiUrl?: string;
+  /**
+   * For server-rendered pages: post every new access token to your own
+   * server, which keeps it in an HttpOnly cookie. Read once, when the
+   * client is created. See the session bridge in the docs.
+   */
+  sessionBridge?: SessionBridgeOptions;
 
   /**
    * How every ZevAuth component under this provider looks, set in code:
@@ -52,6 +58,7 @@ export function ZevAuthProvider({
   publishableKey,
   client: provided,
   apiUrl,
+  sessionBridge,
   appearance,
   localization,
   children,
@@ -64,7 +71,7 @@ export function ZevAuthProvider({
         '<ZevAuthProvider> needs a publishableKey, or a client to use instead.',
       );
     }
-    clientRef.current = createZevAuth({ publishableKey, apiUrl });
+    clientRef.current = createZevAuth({ publishableKey, apiUrl, sessionBridge });
   }
 
   const client = clientRef.current;

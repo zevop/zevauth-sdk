@@ -1,4 +1,14 @@
 import { takePendingPkce } from './internal/pkce.js';
+import { SessionBridge, type SessionBridgeOptions } from './internal/session-bridge.js';
+import {
+  MirroredStorage,
+  buildQuery,
+  createPkce,
+  parseQuery,
+  webCrypto,
+  type AsyncSessionStorageAdapter,
+  type CryptoAdapter,
+} from './internal/native.js';
 import type { HandoffError } from './types.js';
 import { Http } from './internal/http.js';
 import { RefreshCoordinator } from './internal/refresh-coordinator.js';
@@ -33,8 +43,35 @@ export interface ZevAuthOptions {
   /** Defaults to the API the key belongs to. Override for self-hosting. */
   apiUrl?: string;
   storage?: SessionStorageAdapter;
+  /**
+   * Storage that answers asynchronously: the iOS Keychain or Android
+   * Keystore through expo-secure-store, for example. Read once, before
+   * the session is restored, and written behind the scenes after that.
+   * Takes the place of `storage`.
+   */
+  asyncStorage?: AsyncSessionStorageAdapter;
+  /**
+   * Random bytes and SHA-256, for runtimes without Web Crypto (React
+   * Native). Only the native ZevID sign-in uses them.
+   */
+  crypto?: CryptoAdapter;
   fetch?: typeof globalThis.fetch;
+  /**
+   * For server-rendered pages: post every new access token to your own
+   * server, which keeps it in an HttpOnly cookie. Off unless set. See
+   * the session bridge in the docs.
+   */
+  sessionBridge?: SessionBridgeOptions;
 }
+
+/** What `handleIncomingUrl` did with a link the app was opened with. */
+export type IncomingUrlResult =
+  | { status: 'complete' }
+  | { status: 'needs_second_factor' }
+  | { status: 'email_verified' }
+  | { status: 'error'; error: HandoffError }
+  /** Not ours: no code, token or error the SDK recognises. */
+  | { status: 'ignored' };
 
 /**
  * How early a token is refreshed, in seconds.
@@ -53,6 +90,20 @@ export class ZevAuth {
 
   private environment: EnvironmentConfig | null = null;
   private loaded = false;
+
+  /** Set when an async store was given; see `MirroredStorage`. */
+  private readonly mirror: MirroredStorage | null;
+  private readonly bridge: SessionBridge | null;
+  private readonly storageKeys: string[];
+  private readonly cryptoAdapter: CryptoAdapter | null;
+  /**
+   * A native ZevID sign-in waiting for its return: the PKCE verifier,
+   * the state we sent, and the exact redirect `/start` validated. In
+   * memory, because the app process is alive while the system browser
+   * sheet is up; a cold start abandons it, and the exchange then fails
+   * closed.
+   */
+  private nativeZevId: { verifier: string; state: string; redirectUri: string } | null = null;
 
   /** Every way in. */
   readonly signIn: SignInFlow;
@@ -78,7 +129,12 @@ export class ZevAuth {
       );
     }
 
-    const storage = options.storage ?? defaultStorage();
+    this.mirror = options.asyncStorage ? new MirroredStorage(options.asyncStorage) : null;
+    this.cryptoAdapter = options.crypto ?? null;
+    this.bridge = options.sessionBridge
+      ? new SessionBridge(options.sessionBridge, options.fetch ?? globalThis.fetch.bind(globalThis))
+      : null;
+    const storage = this.mirror ?? options.storage ?? defaultStorage();
     /*
      * Per environment, like the session, and kept apart from it: signing
      * out ends the session but deliberately keeps the device remembered,
@@ -86,6 +142,7 @@ export class ZevAuth {
      * password change or factor removal.
      */
     const deviceKey = `zevauth.device.${environmentOf(options.publishableKey)}`;
+    this.storageKeys = [`zevauth.session.${environmentOf(options.publishableKey)}`, deviceKey];
 
     this.http = new Http({
       baseUrl: options.apiUrl ?? inferApiUrl(options.publishableKey),
@@ -176,6 +233,10 @@ export class ZevAuth {
   private loading: Promise<void> | null = null;
 
   private async performLoad(): Promise<void> {
+    // Before anything reads the session: an async store has to be in
+    // memory first. A no-op on the web.
+    if (this.mirror) await this.mirror.preload(this.storageKeys);
+
     this.environment = await this.http.get<EnvironmentConfig>('/v1/environment');
 
     await this.completeHandoffIfPresent();
@@ -640,6 +701,154 @@ export class ZevAuth {
     }
   }
 
+  // ── Native apps ─────────────────────────────────────────────────
+
+  /**
+   * The ZevID sign-in URL for a native app, bound to this client.
+   *
+   * Open it in the system authentication session (ASWebAuthenticationSession
+   * on iOS, Custom Tabs on Android), never in an embedded web view, and
+   * pass the URL it returns to `handleIncomingUrl`. The code that comes
+   * back can only be exchanged with this client's PKCE verifier, for the
+   * exact `redirectUrl` given here, and only if the `state` matches.
+   */
+  async createZevIdAuthorizationUrl(params: { redirectUrl: string }): Promise<string> {
+    const crypto = this.cryptoAdapter ?? webCrypto();
+    if (!crypto) {
+      throw new ZevAuthError(
+        'The native ZevID sign-in needs random bytes and SHA-256. Pass `crypto` when creating the client.',
+        'crypto_unavailable',
+        0,
+      );
+    }
+    const pkce = await createPkce(crypto);
+    this.nativeZevId = { verifier: pkce.verifier, state: pkce.state, redirectUri: params.redirectUrl };
+    const query = buildQuery({
+      publishable_key: this.http.publishableKey,
+      redirect_url: params.redirectUrl,
+      state: pkce.state,
+      code_challenge: pkce.challenge,
+      code_challenge_method: 'S256',
+    });
+    return `${this.http.baseUrl}/v1/auth/zevid/start?${query}`;
+  }
+
+  /**
+   * Re-checks the session when an app comes back to the foreground.
+   *
+   * A phone suspends an app for hours, so the access token is usually
+   * stale and the session may have been ended elsewhere (signed out on
+   * another device, revoked, a ZevID fresh-sign-in window passed). This
+   * refreshes when the token is near expiry and, if the server says the
+   * session is over, signs out locally and says why, exactly as a cold
+   * start does. A network failure leaves the session alone.
+   */
+  async revalidate(): Promise<void> {
+    if (!this.loaded) return;
+    const stored = this.tokens.readPersisted();
+    if (!stored) return;
+    const isNearExpiry = stored.expiresAt - Date.now() < REFRESH_SKEW_SECONDS * 1000;
+    if (!isNearExpiry && this.tokens.getAccessToken()) return;
+    try {
+      await this.coordinator.refresh();
+    } catch (err) {
+      if (!(err instanceof ZevAuthError) || err.status === 0 || err.status === 429 || err.status >= 500) return;
+      this.tokens.clear();
+      if (err.code === 'reauthentication_required') {
+        this.pendingHandoffError = {
+          code: 'zevid_reauthentication_required',
+          description: 'For your security, please sign in with ZevID again.',
+        };
+      }
+      this.emit();
+    }
+  }
+
+  /** Forgets a native ZevID sign-in the person closed without finishing. */
+  cancelZevIdSignIn(): void {
+    this.nativeZevId = null;
+  }
+
+  /**
+   * Finishes whatever a link the app was opened with carries: a sign-in
+   * link or email confirmation (`zv_token`), a ZevID or hosted handoff
+   * (`code`), or a failed one (`error`).
+   *
+   * The web reads its own address bar on load and never needs this. A
+   * native app has no address bar: it receives the link from the OS
+   * (a universal link, an app link, or in development a custom scheme)
+   * and hands it here. Waits for `load()` first.
+   */
+  async handleIncomingUrl(url: string): Promise<IncomingUrlResult> {
+    await this.load();
+    const params = parseQuery(url);
+
+    if (params.zv_token && params.zv_flow) {
+      // A reset needs the developer's own form, as on the web.
+      if (params.zv_flow === 'reset-password') return { status: 'ignored' };
+      try {
+        if (params.zv_flow === 'sign-in') {
+          const result = this.adopt(
+            await this.http.post<SignInResponse>('/v1/auth/magic-link/verify', { token: params.zv_token }),
+          );
+          return result.status === 'complete' ? { status: 'complete' } : { status: 'needs_second_factor' };
+        }
+        if (params.zv_flow === 'verify-email') {
+          await this.http.post('/v1/auth/verify-email', { token: params.zv_token });
+          return { status: 'email_verified' };
+        }
+      } catch (err) {
+        return this.incomingError(
+          err instanceof ZevAuthError ? err.code : 'link_invalid',
+          err instanceof ZevAuthError ? err.message : 'That link has expired or was already used.',
+        );
+      }
+      return { status: 'ignored' };
+    }
+
+    if (params.error) {
+      this.nativeZevId = null;
+      return this.incomingError(params.error, params.error_description ?? 'The sign-in could not be completed.');
+    }
+
+    if (!params.code) return { status: 'ignored' };
+
+    const pending = this.nativeZevId;
+    this.nativeZevId = null;
+    let body: Record<string, string> = { code: params.code };
+    if (pending) {
+      if (params.state !== pending.state) {
+        return this.incomingError('state_mismatch', 'This sign-in was not started from this app. Please try again.');
+      }
+      body = { code: params.code, codeVerifier: pending.verifier, redirectUri: pending.redirectUri };
+    }
+    try {
+      const result = this.adopt(await this.http.post<SignInResponse>('/v1/auth/handoff/exchange', body));
+      return result.status === 'complete' ? { status: 'complete' } : { status: 'needs_second_factor' };
+    } catch (err) {
+      return this.incomingError(
+        err instanceof ZevAuthError ? err.code : 'zevid_error',
+        err instanceof ZevAuthError ? err.message : 'The sign-in could not be completed.',
+      );
+    }
+  }
+
+  /** Kept for `takeHandoffError()` as well as returned, then announced. */
+  private incomingError(code: string, description: string): IncomingUrlResult {
+    const error = { code, description };
+    this.pendingHandoffError = error;
+    this.emit();
+    return { status: 'error', error };
+  }
+
+  /**
+   * Resolves once every session write has reached an async store. For
+   * tests and for an app about to be suspended; the web resolves at once.
+   */
+  flushStorage(): Promise<void> {
+    return this.mirror?.flush() ?? Promise.resolve();
+  }
+
   private snapshot(): ZevAuthState {
     return {
       isLoaded: this.loaded,
@@ -650,7 +859,19 @@ export class ZevAuth {
     };
   }
 
+  /**
+   * Posts the current session to `sessionBridge.url` now and resolves
+   * once the server answered. The handshake page calls this; apps
+   * normally never need to, since every change is posted on its own.
+   */
+  async syncSessionBridge(): Promise<void> {
+    await this.bridge?.sync(this.tokens.getAccessToken());
+  }
+
   private emit(): void {
+    // Every sign-in, refresh, organization switch and sign-out passes
+    // through here, so the bridge cannot miss a token change.
+    this.bridge?.observe(this.tokens.getAccessToken());
     const state = this.snapshot();
     for (const listener of this.listeners) {
       try {

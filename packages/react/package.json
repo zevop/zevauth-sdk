@@ -12,7 +12,7 @@
     "sso"
   ],
   "license": "MIT",
-  "author": "ZevOp",
+  "author": "ZevOp Inc.",
   "homepage": "https://docs.zevauth.com",
   "repository": {
     "type": "git",
@@ -31,6 +31,10 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
+    "./headless": {
+      "types": "./dist/headless.d.ts",
+      "import": "./dist/headless.js"
+    },
     "./styles": {
       "types": "./dist/styles.d.ts",
       "import": "./dist/styles.js"
@@ -39,7 +43,8 @@
   },
   "files": [
     "dist",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "sideEffects": false,
   "engines": {
