@@ -14,6 +14,7 @@ export {
   type Branding,
   type EnvironmentConfig,
   type SignInMethod,
+  type UserSession,
   type ZevAuthSession,
   type ZevAuthState,
   type ZevAuthUser,

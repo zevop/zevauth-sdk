@@ -1,5 +1,10 @@
 import type { Http } from '../internal/http.js';
-import { ZevAuthError, type ActiveOrganization, type ZevAuthUser } from '../types.js';
+import {
+  ZevAuthError,
+  type ActiveOrganization,
+  type UserSession,
+  type ZevAuthUser,
+} from '../types.js';
 import type { OrganizationMembership } from './organizations.js';
 import { uploadImage, type UploadImageOptions } from '../internal/upload.js';
 
@@ -152,5 +157,54 @@ export class UserFlow {
     }
 
     return this.http.post('/v1/me/password', params, { accessToken });
+  }
+
+  /**
+   * Everywhere they are signed in, the current session first.
+   *
+   * For a "Devices" or "Active sessions" screen. Only active, unexpired
+   * sessions are listed: one that ended is not somewhere they are
+   * signed in, whatever the database still remembers about it.
+   */
+  async sessions(): Promise<UserSession[]> {
+    const accessToken = await this.getToken();
+    if (!accessToken) return [];
+
+    const response = await this.http.get<{ sessions: UserSession[] }>(
+      '/v1/me/sessions',
+      { accessToken },
+    );
+    return response.sessions;
+  }
+
+  /**
+   * Signs one OTHER session out.
+   *
+   * The current one is refused (`session_is_current`): ending it is
+   * signing out, and `signOut()` is what also clears this client's
+   * tokens. Another person's session id answers `session_not_found`,
+   * exactly like one that never existed.
+   */
+  async revokeSession(sessionId: string): Promise<void> {
+    const accessToken = await this.getToken();
+    if (!accessToken) {
+      throw new ZevAuthError('Nobody is signed in.', 'not_authenticated', 401);
+    }
+
+    await this.http.delete(`/v1/me/sessions/${encodeURIComponent(sessionId)}`, {
+      accessToken,
+    });
+  }
+
+  /** Signs out everywhere except here. Resolves to how many ended. */
+  async revokeOtherSessions(): Promise<{ revoked: number }> {
+    const accessToken = await this.getToken();
+    if (!accessToken) {
+      throw new ZevAuthError('Nobody is signed in.', 'not_authenticated', 401);
+    }
+
+    return this.http.post('/v1/me/sessions/revoke-others', undefined, {
+      accessToken,
+    });
   }
 }

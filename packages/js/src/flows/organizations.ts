@@ -151,6 +151,81 @@ export class OrganizationsFlow {
   }
 
   /**
+   * Creates an organization, makes the caller its owner, and switches
+   * the session to it.
+   *
+   * Switching is part of creating because the next thing anybody does
+   * with a new organization is act in it: invite someone, rename it,
+   * upload a logo. Every one of those runs on the ACTIVE organization,
+   * and a session left in its old scope would send the first invite to
+   * the wrong company.
+   *
+   * Refusals carry a `code`: `organizations_disabled`,
+   * `organization_creation_disabled`, `organization_limit_reached`,
+   * `organization_slugs_disabled`, `organization_slug_taken`.
+   */
+  async create(params: {
+    name: string;
+    slug?: string;
+  }): Promise<OrganizationMembership> {
+    const accessToken = await this.getToken();
+    if (!accessToken) {
+      throw new ZevAuthError('Nobody is signed in.', 'not_authenticated', 401);
+    }
+
+    const response = await this.http.post<{ organization: OrganizationMembership }>(
+      '/v1/me/organizations',
+      params,
+      { accessToken },
+    );
+
+    await this.switchTo(response.organization.id);
+    return response.organization;
+  }
+
+  /**
+   * Leaves the active organization, then returns to personal scope.
+   *
+   * The last owner cannot leave (`organization_last_owner`): an
+   * organization with nobody to administer it can only be cleaned up by
+   * a support ticket. Transfer ownership, or delete it, first.
+   */
+  async leave(): Promise<void> {
+    const accessToken = await this.getToken();
+    if (!accessToken) {
+      throw new ZevAuthError('Nobody is signed in.', 'not_authenticated', 401);
+    }
+
+    await this.http.post('/v1/me/organization/leave', undefined, { accessToken });
+
+    /*
+     * The tokens still name the organization just left. Switching now,
+     * rather than waiting for the next refresh, is what stops every
+     * component on the page rendering a membership that no longer
+     * exists for up to fifteen minutes.
+     */
+    await this.switchTo(null);
+  }
+
+  /**
+   * Deletes the active organization and every membership in it, then
+   * returns to personal scope. The members' accounts are untouched.
+   *
+   * Needs `org:delete` (owners, by default) and the console's
+   * "Creator can delete" left on. Refusals: `organization_delete_disabled`,
+   * `organization_permission_required`.
+   */
+  async delete(): Promise<void> {
+    const accessToken = await this.getToken();
+    if (!accessToken) {
+      throw new ZevAuthError('Nobody is signed in.', 'not_authenticated', 401);
+    }
+
+    await this.http.delete('/v1/me/organization', { accessToken });
+    await this.switchTo(null);
+  }
+
+  /**
    * Makes one active, rotating the session's tokens.
    *
    * `null` returns to personal scope. The tokens change because the

@@ -181,6 +181,26 @@ export interface HandoffError {
   description: string;
 }
 
+/**
+ * One place the signed-in person is signed in, from `me.sessions()`.
+ *
+ * Descriptive only: nothing here can act as the session. `userAgent` is
+ * the string the browser sent, unparsed, so a component can describe the
+ * device however suits it.
+ */
+export interface UserSession {
+  id: string;
+  userAgent: string | null;
+  ipAddress: string | null;
+  /** How it started: `email_password`, `magic_link`, `zevid`, … */
+  provider: string;
+  createdAt: string;
+  lastActiveAt: string;
+  expiresAt: string;
+  /** The session this client is using. It cannot be revoked; sign out instead. */
+  isCurrent: boolean;
+}
+
 /** What every listener receives. `null` user means signed out. */
 export interface ZevAuthState {
   isLoaded: boolean;
