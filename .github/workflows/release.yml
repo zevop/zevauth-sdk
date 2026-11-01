@@ -1,0 +1,185 @@
+name: Release
+
+# Run from the Actions tab ("Release" → "Run workflow") or:
+#   gh workflow run release.yml -f bump=patch
+#   gh workflow run release.yml -f bump=minor -f packages="js react"
+#   gh workflow run release.yml -f dry-run=true
+#
+# Publishing uses npm Trusted Publishing: npm trusts this workflow's
+# OIDC identity, so there is no npm token stored anywhere and no 2FA
+# prompt, and every package gets a provenance statement. See RELEASING.md
+# for the one-time setup on npmjs.com.
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Version bump for the changed packages
+        type: choice
+        options: [patch, minor]
+        default: patch
+      packages:
+        description: Only these packages (e.g. "js react"); empty means every changed package
+        type: string
+        required: false
+        default: ''
+      dry-run:
+        description: Plan and pack only; publish, commit and tag nothing
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    environment: npm
+    permissions:
+      contents: write
+      id-token: write
+    outputs:
+      released: ${{ steps.done.outputs.released }}
+    env:
+      BUMP: ${{ inputs.bump }}
+      PACKAGES: ${{ inputs.packages }}
+      DRY_RUN: ${{ inputs.dry-run }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          cache: npm
+
+      # Trusted Publishing needs npm 11.5.1 or newer.
+      - run: npm install -g npm@latest
+
+      - run: npm ci
+
+      - name: Plan
+        id: plan
+        run: |
+          args=(--bump "$BUMP")
+          if [ -n "$PACKAGES" ]; then args+=(--packages "$PACKAGES"); fi
+          node scripts/release-ci.mjs plan "${args[@]}"
+          count=$(node -p "require('./.release-plan.json').releases.length")
+          echo "count=$count" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Release plan"
+            echo
+            node -e "for (const r of require('./.release-plan.json').releases) console.log('- \`' + r.name + '\` ' + r.from + ' → ' + r.to + ' (' + r.reason + ')')"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Update the lockfile for the new versions
+        if: steps.plan.outputs.count != '0'
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+
+      - name: Gate
+        if: steps.plan.outputs.count != '0'
+        run: |
+          npm run build
+          npm run typecheck
+          npm run verify
+
+      - name: Publish
+        if: steps.plan.outputs.count != '0'
+        run: |
+          if [ "$DRY_RUN" = "true" ]; then
+            node scripts/release-ci.mjs publish --dry-run
+          else
+            node scripts/release-ci.mjs publish --provenance
+          fi
+
+      - name: Commit and tag
+        if: steps.plan.outputs.count != '0' && inputs.dry-run == false
+        run: |
+          released=$(node scripts/release-ci.mjs summary)
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A packages package-lock.json
+          git commit -m "Release: $released"
+          for t in $released; do git tag "$t"; done
+          git push origin HEAD:${{ github.ref_name }} --follow-tags
+
+      - name: Outputs
+        id: done
+        if: steps.plan.outputs.count != '0' && inputs.dry-run == false
+        run: echo "released=$(node scripts/release-ci.mjs summary)" >> "$GITHUB_OUTPUT"
+
+  docs:
+    # Opens a pull request in zevop/zevauth-docs so the live previews use
+    # the new components. Needs a DOCS_REPO_TOKEN secret (a fine-grained
+    # token with contents and pull requests write on zevauth-docs); without
+    # it the job says so and stops, and Dependabot in the docs repo is the
+    # fallback.
+    needs: release
+    if: contains(needs.release.outputs.released, '@zevauth/react@') || contains(needs.release.outputs.released, '@zevauth/js@')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      RELEASED: ${{ needs.release.outputs.released }}
+      HAS_TOKEN: ${{ secrets.DOCS_REPO_TOKEN != '' }}
+    steps:
+      - name: Check for a docs token
+        id: token
+        run: |
+          if [ "$HAS_TOKEN" != "true" ]; then
+            echo "No DOCS_REPO_TOKEN secret, so no docs pull request. See RELEASING.md." >> "$GITHUB_STEP_SUMMARY"
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v7
+        if: steps.token.outputs.ok == 'true'
+        with:
+          repository: zevop/zevauth-docs
+          token: ${{ secrets.DOCS_REPO_TOKEN }}
+
+      - uses: actions/setup-node@v7
+        if: steps.token.outputs.ok == 'true'
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      - name: Bump the SDK in the docs
+        id: bump
+        if: steps.token.outputs.ok == 'true'
+        run: |
+          specs=()
+          for t in $RELEASED; do
+            case "$t" in
+              @zevauth/react@*|@zevauth/js@*)
+                name="${t%@*}"; version="${t##*@}"
+                # The registry can take a moment to serve a new version.
+                for i in $(seq 1 30); do
+                  [ "$(npm view "$name@$version" version 2>/dev/null)" = "$version" ] && break
+                  sleep 10
+                done
+                specs+=("$name@^$version")
+                ;;
+            esac
+          done
+          npm install --no-audit --no-fund "${specs[@]}"
+          echo "specs=${specs[*]}" >> "$GITHUB_OUTPUT"
+
+      - uses: peter-evans/create-pull-request@v8
+        if: steps.token.outputs.ok == 'true'
+        with:
+          token: ${{ secrets.DOCS_REPO_TOKEN }}
+          branch: sdk/bump-zevauth
+          commit-message: "Use ${{ steps.bump.outputs.specs }}"
+          title: "Use ${{ steps.bump.outputs.specs }}"
+          body: |
+            Released from zevop/zevauth-sdk: ${{ needs.release.outputs.released }}
+
+            The docs previews render the real components, so they need the new version. CI on this pull request runs the full docs build.

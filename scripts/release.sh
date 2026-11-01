@@ -1,98 +1,61 @@
 #!/usr/bin/env bash
 #
-# Bump, gate and publish only the packages that changed.
+# Release from this machine. The primary path is the "Release" GitHub
+# Actions workflow (see RELEASING.md): it needs no npm login and no 2FA
+# prompt, and publishes with provenance. Use this when CI is unavailable.
 #
-# The manual version was five commands and a shell loop, which is five
-# chances to publish something that did not build. Here the gate runs
-# before anything reaches npm, and a failure stops the whole thing.
+#   npm run release                    patch bump of every changed package
+#   npm run release minor              new capability
+#   npm run release -- js react        only these packages
+#   npm run release -- --dry-run       show the plan, change nothing
 #
-#   npm run release              patch bump (a fix, no new surface)
-#   npm run release minor        new capability
-#   npm run release -- --dry-run show what would happen, touch nothing
-#
-# The dry run exists because this script publishes for real, and the only
-# previous way to check it did the right thing was to let it.
-#
-# A minor bump on a 0.x line breaks the `^0.2.0` ranges the packages use
-# on each other, so it prints a reminder rather than leaving you to find
-# out from a customer's install.
+# The plan, the dependent-range raising and the publish order all live in
+# scripts/release-ci.mjs, shared with CI so the two cannot drift. npm asks
+# for your 2FA on each publish.
 set -euo pipefail
-
-DRY=false
-BUMP=patch
-for arg in "$@"; do
-  case "$arg" in
-    --dry-run) DRY=true ;;
-    patch|minor|major) BUMP="$arg" ;;
-  esac
-done
 cd "$(dirname "$0")/.."
 
-# Which packages changed since their version was last set.
-#
-# The first version of this looked at uncommitted changes, which meant
-# committing first — the right habit — made it report nothing to do.
-# Now: find the commit that set each package's current version, and
-# release the package if anything under it changed since. Name packages
-# explicitly to override: `npm run release -- js react`.
-EXPLICIT=""
+DRY=()
+BUMP=patch
+PKGS=()
 for arg in "$@"; do
   case "$arg" in
-    --dry-run|patch|minor|major) ;;
-    *) EXPLICIT="$EXPLICIT @zevauth/${arg#@zevauth/}" ;;
+    --dry-run) DRY=(--dry-run) ;;
+    --) ;;
+    patch|minor|major) BUMP="$arg" ;;
+    *) PKGS+=("${arg#@zevauth/}") ;;
   esac
 done
 
-if [ -n "$EXPLICIT" ]; then
-  CHANGED="$EXPLICIT"
-else
-  CHANGED=""
-  for dir in packages/*/; do
-    name=$(node -p "require('./$dir/package.json').name")
-    version=$(node -p "require('./$dir/package.json').version")
-    # The commit that introduced the current version line.
-    since=$(git log -1 --format=%H -S"\"version\": \"$version\"" -- "$dir/package.json" 2>/dev/null || true)
-    if [ -z "$since" ]; then
-      CHANGED="$CHANGED $name"          # never released from this history
-    elif ! git diff --quiet "$since"..HEAD -- "$dir" || ! git diff --quiet -- "$dir"; then
-      CHANGED="$CHANGED $name"          # committed or uncommitted changes since
-    fi
-  done
+PLAN_ARGS=(--bump "$BUMP")
+if [ ${#PKGS[@]} -gt 0 ]; then
+  PLAN_ARGS+=(--packages "$(IFS=,; echo "${PKGS[*]}")")
 fi
 
-if [ -z "$CHANGED" ]; then
-  echo "Nothing changed in any package since its version was last set."
-  echo "Name one to force it: npm run release -- js"
+node scripts/release-ci.mjs plan "${PLAN_ARGS[@]}" "${DRY[@]}"
+
+if [ "$(node -p "require('./.release-plan.json').releases.length")" = "0" ]; then
   exit 0
 fi
 
-echo "Releasing ($BUMP):"
-for p in $CHANGED; do echo "  $p"; done
-echo
-
-if [ "$DRY" = true ]; then
-  echo "Dry run. Would bump ($BUMP), then build, typecheck, verify, and publish."
+if [ ${#DRY[@]} -gt 0 ]; then
+  echo
+  echo "Dry run: nothing was changed or published."
   exit 0
 fi
 
-# shellcheck disable=SC2086
-npm version "$BUMP" $(printf -- '-w %s ' $CHANGED) --no-git-tag-version >/dev/null
+# Versions and ranges changed, so the lockfile has to follow before the gate.
+npm install --package-lock-only --ignore-scripts --no-audit --no-fund
 
 # Nothing is published unless all three pass.
 npm run build
 npm run typecheck
 npm run verify
 
-if [ "$BUMP" = "minor" ] || [ "$BUMP" = "major" ]; then
-  echo
-  echo "NOTE: a $BUMP bump leaves the ^0.x ranges behind."
-  echo "      Update the @zevauth/* dependency ranges in every package that"
-  echo "      depends on one of these, and publish those too."
-  echo
-fi
+node scripts/release-ci.mjs publish
 
-for p in $CHANGED; do
-  V=$(node -p "require('./packages/${p#@zevauth/}/package.json').version")
-  echo "publishing $p@$V"
-  npm publish -w "$p"
-done
+echo
+echo "Published: $(node scripts/release-ci.mjs summary)"
+echo "Commit the version changes and tag each release, e.g.:"
+echo "  git commit -am \"Release: $(node scripts/release-ci.mjs summary)\""
+echo "  for t in $(node scripts/release-ci.mjs summary); do git tag \"\$t\"; done && git push --follow-tags"

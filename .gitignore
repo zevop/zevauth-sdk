@@ -11,3 +11,6 @@ dist/
 # deps gets a local one too.
 packages/*/node_modules/
 packages/*/dist/
+
+# Written by scripts/release-ci.mjs while a release runs.
+.release-plan.json
