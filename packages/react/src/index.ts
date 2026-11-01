@@ -16,8 +16,35 @@ export { ZevAuthProvider, type ZevAuthProviderProps } from './provider.js';
  * ```tsx
  * <style id={componentStyleId} dangerouslySetInnerHTML={{ __html: componentStyles }} />
  * ```
+ *
+ * With `appearance.cssLayerName`, inline `getComponentStyles({ cssLayerName })`
+ * instead, so the server sends the same layered CSS the runtime would add.
  */
-export { componentStyles, componentStyleId } from './internal/styles.js';
+export {
+  componentStyles,
+  componentStyleId,
+  getComponentStyles,
+} from './internal/styles.js';
+
+/*
+ * The customisation vocabulary, so an app can type a shared theme in a
+ * file of its own and hand the same object to the provider and to any
+ * one component.
+ */
+export type {
+  Appearance,
+  AppearanceElementKey,
+  AppearanceElements,
+  AppearanceElementValue,
+  AppearanceVariables,
+  ThemedColor,
+} from './internal/appearance.js';
+/*
+ * The theme objects themselves, so a developer can spread one into
+ * their own (`{ ...themes.soft, variables: { ... } }`) or show the list
+ * in a settings screen of their own.
+ */
+export { themes, type ThemeName } from './internal/themes.js';
 /*
  * Exported so a developer building their own settings screen gets the
  * same picture control our components use, rather than reimplementing

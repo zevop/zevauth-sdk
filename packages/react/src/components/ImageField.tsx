@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ZevAuthError } from '@zevauth/js';
 import { Alert } from './parts.js';
+import { useElements } from '../internal/appearance.js';
 
 export interface ImageFieldProps {
   label: string;
@@ -49,6 +50,7 @@ export function ImageField({
   shape = 'circle',
   isDisabled,
 }: ImageFieldProps) {
+  const el = useElements();
   const inputRef = useRef<HTMLInputElement>(null);
   const [progress, setProgress] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -106,12 +108,12 @@ export function ImageField({
   const showImage = value && !hasFailedToLoad;
 
   return (
-    <div className="zv-field">
-      <span className="zv-label">{label}</span>
+    <div {...el('field')}>
+      <span {...el('label')}>{label}</span>
       {error ? <Alert>{error}</Alert> : null}
 
-      <div className="zv-image-field">
-        <div className="zv-image-preview" data-shape={shape}>
+      <div {...el('imageField')}>
+        <div {...el('imagePreview')} data-shape={shape}>
           {showImage ? (
             <img src={value} alt="" onError={() => setHasFailedToLoad(true)} />
           ) : (
@@ -131,21 +133,21 @@ export function ImageField({
           {isBusy ? (
             <>
               <div
-                className="zv-progress"
+                {...el('progress')}
                 role="progressbar"
                 aria-label={`Uploading ${label.toLowerCase()}`}
                 aria-valuenow={Math.round((progress ?? 0) * 100)}
               >
                 <span style={{ width: `${Math.round((progress ?? 0) * 100)}%` }} />
               </div>
-              <span className="zv-hint">Uploading</span>
+              <span {...el('hint')}>Uploading</span>
             </>
           ) : (
             <>
               <div className="zv-image-buttons">
                 <button
                   type="button"
-                  className="zv-button"
+                  {...el(['button', 'buttonSecondary'])}
                   data-variant="secondary"
                   disabled={isDisabled}
                   onClick={() => inputRef.current?.click()}
@@ -155,7 +157,7 @@ export function ImageField({
                 {value ? (
                   <button
                     type="button"
-                    className="zv-button"
+                    {...el(['button', 'buttonLink'])}
                     data-variant="ghost"
                     disabled={isDisabled}
                     onClick={() => void remove()}
@@ -164,7 +166,7 @@ export function ImageField({
                   </button>
                 ) : null}
               </div>
-              <span className="zv-hint">PNG, JPG or WebP. Up to 1 MB.</span>
+              <span {...el('hint')}>PNG, JPG or WebP. Up to 1 MB.</span>
             </>
           )}
         </div>

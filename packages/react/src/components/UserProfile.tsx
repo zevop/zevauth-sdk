@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { ZevAuthError } from '@zevauth/js';
-import { useZevAuthContext } from '../internal/context.js';
+import { useComponentAppearance } from '../internal/context.js';
+import type { Appearance } from '../internal/appearance.js';
 import { Brandable } from './Brandable.js';
 import { Alert, Spinner } from './parts.js';
 import { ImageField } from './ImageField.js';
@@ -24,6 +25,12 @@ export interface UserProfileProps {
    * wrong with their account.
    */
   defaultPasswordOpen?: boolean;
+  /**
+   * How this one component looks, merged over the provider's
+   * `appearance`. See `Appearance` for the console fields, `variables`
+   * and `elements`.
+   */
+  appearance?: Appearance;
   className?: string;
 }
 
@@ -44,9 +51,16 @@ export interface UserProfileProps {
 export function UserProfile({
   section = 'all',
   defaultPasswordOpen = false,
+  appearance,
   className,
 }: UserProfileProps) {
-  const { client, state } = useZevAuthContext('<UserProfile>');
+  const {
+    client,
+    state,
+    branding,
+    appearance: appearanceLayers,
+    el,
+  } = useComponentAppearance('<UserProfile>', appearance);
 
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -130,16 +144,16 @@ export function UserProfile({
   };
 
   return (
-    <Brandable branding={client.branding} className={className}>
-      <div className="zv-card" data-size="wide">
+    <Brandable branding={branding} appearance={appearanceLayers} el={el} className={className}>
+      <div {...el('card')} data-size="wide">
         {section !== 'security' ? (
-          <h1 className="zv-title" style={{ textAlign: 'left' }}>
+          <h1 {...el('title', { textAlign: 'left' })}>
             Your profile
           </h1>
         ) : null}
 
         {section !== 'security' ? (
-          <form className="zv-fields" onSubmit={onSaveProfile}>
+          <form {...el('fields')} onSubmit={onSaveProfile}>
             {profileError ? <Alert>{profileError}</Alert> : null}
 
             {/*
@@ -160,13 +174,13 @@ export function UserProfile({
               onSave={(imageUrl) => client.me.update({ imageUrl })}
             />
 
-            <div className="zv-field">
-              <label className="zv-label" htmlFor="zv-profile-first">
+            <div {...el('field')}>
+              <label {...el('label')} htmlFor="zv-profile-first">
                 First name
               </label>
               <input
                 id="zv-profile-first"
-                className="zv-input"
+                {...el('input')}
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
                 disabled={isSavingProfile}
@@ -174,13 +188,13 @@ export function UserProfile({
               />
             </div>
 
-            <div className="zv-field">
-              <label className="zv-label" htmlFor="zv-profile-last">
+            <div {...el('field')}>
+              <label {...el('label')} htmlFor="zv-profile-last">
                 Last name
               </label>
               <input
                 id="zv-profile-last"
-                className="zv-input"
+                {...el('input')}
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
                 disabled={isSavingProfile}
@@ -188,29 +202,28 @@ export function UserProfile({
               />
             </div>
 
-            <div className="zv-field">
-              <label className="zv-label">Email</label>
+            <div {...el('field')}>
+              <label {...el('label')}>Email</label>
               {/*
                 The address on the account, which is the current one
                 until a change is proved. Not editable in place: the new
                 address is asked for separately, below.
               */}
               <input
-                className="zv-input"
+                {...el('input')}
                 value={user.email ?? ''}
                 disabled
                 readOnly
               />
 
               {pendingEmail ? (
-                <div className="zv-notice">
+                <div {...el('notice')}>
                   Waiting for {pendingEmail} to be confirmed. Nothing changes
                   until the link we sent there is opened.{' '}
                   <button
                     type="button"
-                    className="zv-button"
+                    {...el(['button', 'buttonLink'], { width: 'auto', display: 'inline-flex' })}
                     data-variant="ghost"
-                    style={{ width: 'auto', display: 'inline-flex' }}
                     onClick={() => {
                       void client.me.cancelEmailChange().then(() => {
                         setPendingEmail(null);
@@ -224,8 +237,7 @@ export function UserProfile({
               ) : (
                 <button
                   type="button"
-                  className="zv-more"
-                  style={{ justifyContent: 'flex-start', padding: '2px 0' }}
+                  {...el('moreToggle', { justifyContent: 'flex-start', padding: '2px 0' })}
                   aria-expanded={isEmailOpen}
                   onClick={() => setIsEmailOpen((open) => !open)}
                 >
@@ -251,32 +263,32 @@ export function UserProfile({
               >
                 {emailError ? <Alert>{emailError}</Alert> : null}
 
-                <div className="zv-field">
-                  <label className="zv-label" htmlFor="zv-new-email">
+                <div {...el('field')}>
+                  <label {...el('label')} htmlFor="zv-new-email">
                     New email address
                   </label>
                   <input
                     id="zv-new-email"
-                    className="zv-input"
+                    {...el('input')}
                     type="email"
                     value={newEmail}
                     onChange={(e) => setNewEmail(e.target.value)}
                     disabled={isSavingEmail}
                     autoComplete="email"
                   />
-                  <span className="zv-hint">
+                  <span {...el('hint')}>
                     We will send a link there. Your address does not change
                     until you open it.
                   </span>
                 </div>
 
-                <div className="zv-field">
-                  <label className="zv-label" htmlFor="zv-email-password">
+                <div {...el('field')}>
+                  <label {...el('label')} htmlFor="zv-email-password">
                     Current password
                   </label>
                   <input
                     id="zv-email-password"
-                    className="zv-input"
+                    {...el('input')}
                     type="password"
                     value={emailPassword}
                     onChange={(e) => setEmailPassword(e.target.value)}
@@ -287,7 +299,7 @@ export function UserProfile({
 
                 <button
                   type="button"
-                  className="zv-button"
+                  {...el(['button', 'buttonSecondary'])}
                   data-variant="secondary"
                   disabled={isSavingEmail || !newEmail}
                   onClick={() => {
@@ -325,7 +337,7 @@ export function UserProfile({
 
             <button
               type="submit"
-              className="zv-button"
+              {...el(['button', 'buttonPrimary'])}
               data-variant="primary"
               disabled={isSavingProfile}
             >
@@ -335,10 +347,10 @@ export function UserProfile({
           </form>
         ) : null}
 
-        {section === 'all' ? <hr className="zv-section-divider" /> : null}
+        {section === 'all' ? <hr {...el('sectionDivider')} /> : null}
 
         {section !== 'profile' ? (
-          <form className="zv-fields" onSubmit={onChangePassword}>
+          <form {...el('fields')} onSubmit={onChangePassword}>
             {/*
             A disclosure, not a heading.
 
@@ -349,12 +361,11 @@ export function UserProfile({
           */}
             <button
               type="button"
-              className="zv-more"
-              style={{ justifyContent: 'space-between', padding: '4px 0' }}
+              {...el('moreToggle', { justifyContent: 'space-between', padding: '4px 0' })}
               aria-expanded={isPasswordOpen}
               onClick={() => setIsPasswordOpen((open) => !open)}
             >
-              <span className="zv-label" style={{ fontSize: 13.5 }}>
+              <span {...el('label', { fontSize: 'var(--zv-font-size)' })}>
                 Change password
               </span>
               <svg
@@ -381,7 +392,7 @@ export function UserProfile({
               >
                 {passwordError ? <Alert>{passwordError}</Alert> : null}
                 {revoked !== null ? (
-                  <div className="zv-notice">
+                  <div {...el('notice')}>
                     Password changed.
                     {revoked > 0
                       ? ` We signed out ${revoked} other ${revoked === 1 ? 'session' : 'sessions'}.`
@@ -389,13 +400,13 @@ export function UserProfile({
                   </div>
                 ) : null}
 
-                <div className="zv-field">
-                  <label className="zv-label" htmlFor="zv-current-password">
+                <div {...el('field')}>
+                  <label {...el('label')} htmlFor="zv-current-password">
                     Current password
                   </label>
                   <input
                     id="zv-current-password"
-                    className="zv-input"
+                    {...el('input')}
                     type="password"
                     value={currentPassword}
                     onChange={(e) => setCurrentPassword(e.target.value)}
@@ -404,27 +415,27 @@ export function UserProfile({
                   />
                 </div>
 
-                <div className="zv-field">
-                  <label className="zv-label" htmlFor="zv-new-password">
+                <div {...el('field')}>
+                  <label {...el('label')} htmlFor="zv-new-password">
                     New password
                   </label>
                   <input
                     id="zv-new-password"
-                    className="zv-input"
+                    {...el('input')}
                     type="password"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                     disabled={isSavingPassword}
                     autoComplete="new-password"
                   />
-                  <span className="zv-hint">
+                  <span {...el('hint')}>
                     8 characters or more. Your other devices will be signed out.
                   </span>
                 </div>
 
                 <button
                   type="submit"
-                  className="zv-button"
+                  {...el(['button', 'buttonSecondary'])}
                   data-variant="secondary"
                   disabled={
                     isSavingPassword ||

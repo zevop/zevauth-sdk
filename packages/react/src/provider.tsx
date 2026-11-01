@@ -1,11 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import {
-  createZevAuth,
-  type Appearance,
-  type ZevAuth,
-  type ZevAuthState,
-} from '@zevauth/js';
+import { createZevAuth, type ZevAuth, type ZevAuthState } from '@zevauth/js';
 import { ZevAuthContext, mergeAppearance } from './internal/context.js';
+import type { Appearance } from './internal/appearance.js';
 
 export interface ZevAuthProviderProps {
   publishableKey?: string;
@@ -14,8 +10,9 @@ export interface ZevAuthProviderProps {
   apiUrl?: string;
 
   /**
-   * Branding overridden in code, applied to every ZevAuth component
-   * under this provider.
+   * How every ZevAuth component under this provider looks, set in code:
+   * the console's own fields, design tokens (`variables`), and single
+   * parts (`elements`). A component's own `appearance` merges over it.
    *
    * Anything you leave out keeps whatever the console is set to, so a
    * team can move one value into their repository without moving all of
@@ -99,16 +96,21 @@ export function ZevAuthProvider({
    * stick.
    */
   const branding = useMemo(
-    () => mergeAppearance(client.branding, appearance),
+    () => mergeAppearance(client.branding, appearance && stripCodeOnly(appearance)),
     [client, state, appearance],
   );
 
   const value = useMemo(
-    () => ({ client, state, branding }),
-    [client, state, branding],
+    () => ({ client, state, branding, appearance }),
+    [client, state, branding, appearance],
   );
 
   return (
     <ZevAuthContext.Provider value={value}>{children}</ZevAuthContext.Provider>
   );
+}
+
+/** The console fields alone, without the code-only layers. */
+function stripCodeOnly({ theme: _t, variables: _v, elements: _e, cssLayerName: _l, ...rest }: Appearance) {
+  return rest;
 }

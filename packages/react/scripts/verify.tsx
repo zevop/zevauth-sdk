@@ -19,7 +19,8 @@ import { SignInWithZevId } from '../src/components/SignInWithZevId';
 import { readableOn } from '../src/components/Brandable';
 import { OrganizationProfile } from '../src/components/OrganizationProfile';
 import { SignUp } from '../src/components/SignUp';
-import { componentStyles } from '../src/internal/styles';
+import { componentStyles, getComponentStyles } from '../src/internal/styles';
+import type { Appearance } from '../src/internal/appearance';
 import {
   EmailUnverified,
   EmailVerified,
@@ -122,7 +123,7 @@ function clientIn(state: {
   return client;
 }
 
-function render(client: ZevAuth, children: ReactNode): string {
+function render(client: ZevAuth, children: ReactNode, appearance?: Appearance): string {
   /*
    * `<!-- -->` separators are stripped. React inserts one between
    * adjacent text expressions so it can find the boundaries again when
@@ -131,7 +132,7 @@ function render(client: ZevAuth, children: ReactNode): string {
    * component.
    */
   return renderToString(
-    <ZevAuthProvider client={client}>{children}</ZevAuthProvider>,
+    <ZevAuthProvider client={client} appearance={appearance}>{children}</ZevAuthProvider>,
   ).replaceAll('<!-- -->', '');
 }
 
@@ -442,6 +443,108 @@ console.log('\n\x1b[1mOverriding the console from code\x1b[0m');
     <SignIn />,
   );
   check('the form can start at the top instead of centring', top.includes('data-align="top"'));
+}
+
+console.log('\n\x1b[1mAppearance: variables and elements\x1b[0m');
+
+{
+  const base = { loaded: true, user: null, methods: ['email_password', 'zevid'] } as const;
+  const signedIn = { loaded: true, user: USER } as const;
+
+  /*
+   * The bug this pins: the components paint `accentOnLight`, so an
+   * `accentColor` set in code changed a field nothing read.
+   */
+  const accent = render(clientIn({ ...base }), <SignIn appearance={{ accentColor: '#ff5500' }} />);
+  check('an accentColor set in code actually paints', accent.includes('--zv-accent:#ff5500'), accent.slice(0, 300));
+
+  const vars = render(
+    clientIn({ ...base }),
+    <SignIn />,
+    {
+      variables: {
+        colorPrimary: '#5b3df5',
+        colorBackground: { light: '#fafafa', dark: '#0b0b0f' },
+        fontSize: '15px',
+        borderRadius: '2px',
+        cardShadow: '0 1px 2px rgba(0,0,0,.1)',
+      },
+    },
+  );
+  check('variables land as custom properties on the root', vars.includes('--zv-accent:#5b3df5') && vars.includes('--zv-font-size:15px') && vars.includes('--zv-radius:2px'));
+  check('a light/dark pair picks the scheme being painted', vars.includes('--zv-surface:#fafafa') && !vars.includes('#0b0b0f'));
+  check('and text on the primary is worked out when left out', vars.includes('--zv-on-accent:#ffffff'));
+
+  const els = render(
+    clientIn({ ...base }),
+    <SignIn appearance={{ elements: { buttonPrimary: { letterSpacing: '0.02em' } } }} />,
+    { elements: { card: 'my-card', buttonPrimary: 'my-primary', input: { borderWidth: 2 }, zevIdButton: 'my-zevid' } },
+  );
+  check('an element class is added beside our own', els.includes('class="zv-card my-card"'));
+  check('a variant key reaches only that variant', els.includes('my-primary') && (els.match(/my-primary/g) ?? []).length === 1);
+  check('an element style object is applied inline', els.includes('border-width:2px'));
+  check('a component merges its elements over the provider’s', els.includes('my-primary') && els.includes('letter-spacing:0.02em'));
+  check('the ZevID button can be addressed on its own', els.includes('my-zevid'));
+
+  const flatTitle = render(
+    clientIn({ ...signedIn }),
+    <UserProfile />,
+    { elements: { title: { textAlign: 'center' } } },
+  );
+  check('a developer style beats the component’s own inline style', flatTitle.includes('text-align:center') && !flatTitle.includes('text-align:left'));
+
+  /*
+   * These read `client.branding` directly before, so the provider's
+   * appearance never reached them.
+   */
+  const button = render(clientIn({ ...signedIn }), <UserButton />, { variables: { colorPrimary: '#123456' }, elements: { menuTrigger: 'my-trigger' } });
+  check('the provider’s appearance reaches UserButton', button.includes('--zv-accent:#123456') && button.includes('my-trigger'));
+  const profile = render(clientIn({ ...signedIn }), <UserProfile />, { accentColor: '#654321' });
+  check('and UserProfile', profile.includes('--zv-accent:#654321'));
+  const zevid = render(clientIn({ ...base }), <SignInWithZevId appearance={{ elements: { zevIdButton: 'only-here' } }} />);
+  check('and a component-level appearance works on the ZevID button', zevid.includes('only-here'));
+
+  const signUp = render(
+    clientIn({ loaded: true, user: null, methods: ['email_password'], branding: { signUpTitle: 'Console title' } }),
+    <SignUp appearance={{ signUpTitle: 'Code title' }} />,
+  );
+  check('a signUpTitle set in code is the one printed', signUp.includes('Code title') && !signUp.includes('Console title'));
+}
+
+console.log('\n\x1b[1mNamed themes\x1b[0m');
+{
+  const base = { loaded: true, user: null, methods: ['email_password'] } as const;
+  const soft = render(clientIn({ ...base }), <SignIn />, { theme: 'soft' });
+  check('a named theme applies its tokens', soft.includes('--zv-radius:10px') && soft.includes('--zv-card-shadow:'));
+  check('and its elements', soft.includes('calc(var(--zv-card-px) * -1)'));
+  check('without touching the brand colour', soft.includes('--zv-accent:#2563eb'));
+
+  const over = render(clientIn({ ...base }), <SignIn />, { theme: 'soft', variables: { borderRadius: '3px' } });
+  check('your own values sit over the theme', over.includes('--zv-radius:3px') && !over.includes('--zv-radius:10px'));
+
+  const local = render(clientIn({ ...base }), <SignIn appearance={{ theme: 'sharp' }} />, { theme: 'soft', variables: { cardWidth: '400px' } });
+  check('a component theme sits over the provider’s', local.includes('--zv-radius:0px'));
+  check('and provider values the theme does not set are kept', local.includes('--zv-card-width:400px'));
+
+  const minimal = render(clientIn({ ...base }), <SignIn />, { theme: 'minimal' });
+  check('field outlines go through a token, so error and focus states survive', minimal.includes('--zv-field-border:transparent') && !/class="zv-input"[^>]*style="[^"]*border-color/.test(minimal));
+  check('an unknown theme name is ignored rather than crashing', render(clientIn({ ...base }), <SignIn />, { theme: 'nope' as never }).includes('zv-card'));
+}
+
+console.log('\n\x1b[1mThe stylesheet in a cascade layer\x1b[0m');
+{
+  check('unlayered by default', getComponentStyles() === componentStyles);
+  check('wrapped in the named layer when asked', getComponentStyles({ cssLayerName: 'zevauth' }).startsWith('@layer zevauth{'));
+  let threw = false;
+  try { getComponentStyles({ cssLayerName: 'x}{body{display:none' }); } catch { threw = true; }
+  check('and a name that could break out of the block is refused', threw);
+  /*
+   * A host page's global \`:focus-visible\` outline drew a second ring
+   * around our own, with a gap between. The guard has to sit at the
+   * isolation block's doubled-class strength to beat it.
+   */
+  check('our controls drop a host page\u2019s focus outline', /\.zv-root\.zv-root :is\([^)]*\.zv-input[^)]*\):focus-visible \{ outline: none; \}/.test(componentStyles));
+  check('every font size scales from the one token', !/font-size:\s*[0-9.]+px/.test(componentStyles.replace('--zv-font-size: 13.5px', '')));
 }
 
 console.log('\n\x1b[1mForgetting a password\x1b[0m');

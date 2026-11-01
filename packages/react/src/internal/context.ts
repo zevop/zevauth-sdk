@@ -1,5 +1,12 @@
-import { createContext, useContext } from 'react';
-import type { Appearance, Branding, ZevAuth, ZevAuthState } from '@zevauth/js';
+import { createContext, useContext, useMemo } from 'react';
+import type { Appearance as BrandingAppearance, Branding, ZevAuth, ZevAuthState } from '@zevauth/js';
+import {
+  createElementResolver,
+  mergeAppearanceLayers,
+  type Appearance,
+  type ElementResolver,
+  type MergedAppearance,
+} from './appearance.js';
 
 export interface ZevAuthContextValue {
   client: ZevAuth;
@@ -12,6 +19,8 @@ export interface ZevAuthContextValue {
    * check for one.
    */
   branding: Branding | null;
+  /** The provider's `appearance`, as given, for components to merge over. */
+  appearance?: Appearance;
 }
 
 /**
@@ -25,13 +34,29 @@ export interface ZevAuthContextValue {
  */
 export function mergeAppearance(
   branding: Branding | null,
-  appearance: Appearance | undefined,
+  appearance: BrandingAppearance | undefined,
 ): Branding | null {
   if (!branding) return branding;
   if (!appearance) return branding;
+
+  /*
+   * The components paint `accentOnLight` / `accentOnDark`, never
+   * `accentColor`: those are the server's contrast-corrected versions.
+   * So an `accentColor` set in code changed a field nothing read, and
+   * the brand colour a developer put in their repository never showed.
+   * Code is the more specific instruction, so it is used as given for
+   * both surfaces unless the pair was set too. Text on it is still
+   * worked out for legibility by `Brandable`.
+   */
+  const accent =
+    appearance.accentColor && !appearance.accentOnLight && !appearance.accentOnDark
+      ? { accentOnLight: appearance.accentColor, accentOnDark: appearance.accentColor }
+      : {};
+
   return {
     ...branding,
     ...appearance,
+    ...accent,
     appName: branding.appName,
     showPoweredBy: branding.showPoweredBy,
   };
@@ -58,4 +83,45 @@ export function useZevAuthContext(hookName: string): ZevAuthContextValue {
   }
 
   return value;
+}
+
+export interface ComponentAppearance {
+  client: ZevAuth;
+  state: ZevAuthState;
+  /** The console's branding with every `appearance` layer merged over it. */
+  branding: Branding | null;
+  appearance: MergedAppearance;
+  /** `className` and `style` for one part; see `createElementResolver`. */
+  el: ElementResolver;
+}
+
+/**
+ * Everything a component needs to render in the developer's look.
+ *
+ * Every component calls this, rather than some reading `client.branding`
+ * and some reading context. Before it existed, half of them did the
+ * former and silently ignored the provider's `appearance`: a developer
+ * who set their colour once got it on `<SignIn>` and not on the
+ * `<UserButton>` beside it.
+ */
+export function useComponentAppearance(
+  hookName: string,
+  local: Appearance | undefined,
+): ComponentAppearance {
+  const { client, state, appearance: provided } = useZevAuthContext(hookName);
+
+  /*
+   * `state` is a dependency because `client.branding` arrives with the
+   * environment load, which is what moves `isLoaded`.
+   */
+  return useMemo(() => {
+    const appearance = mergeAppearanceLayers(provided, local);
+    return {
+      client,
+      state,
+      branding: mergeAppearance(client.branding, appearance.branding),
+      appearance,
+      el: createElementResolver(appearance.elements),
+    };
+  }, [client, state, provided, local]);
 }

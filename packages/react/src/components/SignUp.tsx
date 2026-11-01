@@ -1,9 +1,7 @@
 import { useState, type FormEvent, type ReactNode } from 'react';
-import { ZevAuthError, type Appearance } from '@zevauth/js';
-import {
-  mergeAppearance,
-  useZevAuthContext,
-} from '../internal/context.js';
+import { ZevAuthError } from '@zevauth/js';
+import { useComponentAppearance } from '../internal/context.js';
+import type { Appearance } from '../internal/appearance.js';
 import { Brandable } from './Brandable.js';
 import {
   Alert,
@@ -65,7 +63,13 @@ export function SignUp({
   appearance,
   requireConfirmPassword = true,
 }: SignUpProps) {
-  const { client, state, branding: contextBranding } = useZevAuthContext('<SignUp>');
+  const {
+    client,
+    state,
+    branding,
+    appearance: appearanceLayers,
+    el,
+  } = useComponentAppearance('<SignUp>', appearance);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -76,14 +80,6 @@ export function SignUp({
   const [isBusy, setIsBusy] = useState(false);
   const [awaitingVerification, setAwaitingVerification] = useState(false);
 
-  /*
-   * From context, not from the client: the provider has already
-   * merged any `appearance` over the server's values, and a component
-   * reading `client.branding` would quietly ignore it.
-   */
-  const branding = appearance
-    ? mergeAppearance(contextBranding, appearance)
-    : contextBranding;
 
   /*
    * The same layout as sign-in, from the same setting. A product whose
@@ -152,20 +148,20 @@ export function SignUp({
   };
 
   return (
-    <Brandable branding={branding} className={className}>
+    <Brandable branding={branding} appearance={appearanceLayers} el={el} className={className}>
       <Shell
         layout={resolvedLayout}
         align={branding?.contentAlign ?? 'center'}
         aside={aside ?? <BrandedAside branding={branding} />}
       >
-      <div className="zv-card" data-chrome={branding?.cardStyle ?? 'card'}>
+      <div {...el('card')} data-chrome={branding?.cardStyle ?? 'card'}>
         {client.isTestMode ? <TestModeBadge /> : null}
         <Identity branding={branding} />
 
         {awaitingVerification ? (
           <>
-            <h1 className="zv-title">Confirm your email</h1>
-            <p className="zv-subtitle">
+            <h1 {...el('title')}>Confirm your email</h1>
+            <p {...el('subtitle')}>
               {wantsCode && wantsLink
                 ? `We sent a link and a code to ${email}. Open the link, or enter the code below.`
                 : wantsCode
@@ -184,7 +180,7 @@ export function SignUp({
             */}
             {wantsCode ? (
               <form
-                className="zv-fields"
+                {...el('fields')}
                 onSubmit={(event) => {
                   event.preventDefault();
                   setError(null);
@@ -201,13 +197,13 @@ export function SignUp({
                     .finally(() => setIsBusy(false));
                 }}
               >
-                <div className="zv-field">
-                  <label className="zv-label" htmlFor="zv-verify-code">
+                <div {...el('field')}>
+                  <label {...el('label')} htmlFor="zv-verify-code">
                     Verification code
                   </label>
                   <input
                     id="zv-verify-code"
-                    className="zv-input"
+                    {...el('input')}
                     value={code}
                     onChange={(e) => setCode(e.target.value)}
                     disabled={isBusy}
@@ -221,7 +217,7 @@ export function SignUp({
                 </div>
                 <button
                   type="submit"
-                  className="zv-button"
+                  {...el(['button', 'buttonPrimary'])}
                   data-variant="primary"
                   disabled={isBusy || code.length === 0}
                 >
@@ -234,8 +230,8 @@ export function SignUp({
         ) : (
           <>
             <Heading
-              title={client.branding?.signUpTitle}
-              subtitle={client.branding?.signUpSubtitle}
+              title={branding?.signUpTitle}
+              subtitle={branding?.signUpSubtitle}
               fallbackTitle="Create your account"
             />
             {error ? <Alert>{error}</Alert> : null}
@@ -244,7 +240,7 @@ export function SignUp({
               <>
                 <button
                   type="button"
-                  className="zv-button"
+                  {...el(['button', 'buttonSecondary'])}
                   data-variant="secondary"
                   disabled={isBusy}
                   onClick={() => client.signIn.withZevId()}
@@ -264,29 +260,29 @@ export function SignUp({
             ) : null}
 
             {hasPassword ? (
-              <form className="zv-fields" onSubmit={onSubmit}>
-                <div className="zv-field">
-                  <label className="zv-label" htmlFor="zv-firstname">
+              <form {...el('fields')} onSubmit={onSubmit}>
+                <div {...el('field')}>
+                  <label {...el('label')} htmlFor="zv-firstname">
                     First name
                   </label>
                   <input
                     id="zv-firstname"
-                    className="zv-input"
+                    {...el('input')}
                     value={firstName}
                     onChange={(e) => setFirstName(e.target.value)}
                     disabled={isBusy}
                     autoComplete="given-name"
                   />
-                  <span className="zv-hint">Optional.</span>
+                  <span {...el('hint')}>Optional.</span>
                 </div>
 
-                <div className="zv-field">
-                  <label className="zv-label" htmlFor="zv-signup-email">
+                <div {...el('field')}>
+                  <label {...el('label')} htmlFor="zv-signup-email">
                     Email
                   </label>
                   <input
                     id="zv-signup-email"
-                    className="zv-input"
+                    {...el('input')}
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -296,13 +292,13 @@ export function SignUp({
                   />
                 </div>
 
-                <div className="zv-field">
-                  <label className="zv-label" htmlFor="zv-signup-password">
+                <div {...el('field')}>
+                  <label {...el('label')} htmlFor="zv-signup-password">
                     Password
                   </label>
                   <input
                     id="zv-signup-password"
-                    className="zv-input"
+                    {...el('input')}
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
@@ -312,7 +308,7 @@ export function SignUp({
                     autoComplete="new-password"
                     required
                   />
-                  <span className="zv-hint">8 characters or more.</span>
+                  <span {...el('hint')}>8 characters or more.</span>
                 </div>
 
                 {/*
@@ -326,13 +322,13 @@ export function SignUp({
                   products that would rather trust the reveal button.
                 */}
                 {requireConfirmPassword ? (
-                  <div className="zv-field">
-                    <label className="zv-label" htmlFor="zv-signup-confirm">
+                  <div {...el('field')}>
+                    <label {...el('label')} htmlFor="zv-signup-confirm">
                       Confirm password
                     </label>
                     <input
                       id="zv-signup-confirm"
-                      className="zv-input"
+                      {...el('input')}
                       type="password"
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
@@ -345,7 +341,7 @@ export function SignUp({
                         mistake. Saying "does not match" against an empty
                         box is telling somebody off for not finishing. */}
                     {mismatch ? (
-                      <span className="zv-fielderror">
+                      <span {...el('fieldError')}>
                         These passwords do not match.
                       </span>
                     ) : null}
@@ -354,7 +350,7 @@ export function SignUp({
 
                 <button
                   type="submit"
-                  className="zv-button"
+                  {...el(['button', 'buttonPrimary'])}
                   data-variant="primary"
                   disabled={
                     isBusy || !email || password.length < 8 || mismatch ||
@@ -368,7 +364,7 @@ export function SignUp({
             ) : null}
 
             {!hasPassword && !hasZevId && state.isLoaded ? (
-              <div className="zv-notice">
+              <div {...el('notice')}>
                 No sign-up methods are enabled for this environment. Turn one
                 on under Authentication in the ZevAuth console.
               </div>

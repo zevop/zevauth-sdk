@@ -1,4 +1,5 @@
-import { useZevAuthContext } from '../internal/context.js';
+import { useComponentAppearance } from '../internal/context.js';
+import type { Appearance } from '../internal/appearance.js';
 import { Brandable } from './Brandable.js';
 import { ZevMark } from './parts.js';
 
@@ -14,6 +15,12 @@ export interface SignInWithZevIdProps {
    * portal that already has its own button language.
    */
   shape?: 'default' | 'pill' | 'square';
+  /**
+   * How this one component looks, merged over the provider's
+   * `appearance`. See `Appearance` for the console fields, `variables`
+   * and `elements`.
+   */
+  appearance?: Appearance;
   className?: string;
 }
 
@@ -38,15 +45,21 @@ export function SignInWithZevId({
   label = 'Continue with ZevID',
   variant = 'secondary',
   shape = 'default',
+  appearance,
   className,
 }: SignInWithZevIdProps) {
-  const { client } = useZevAuthContext('<SignInWithZevId>');
+  const {
+    client,
+    branding,
+    appearance: appearanceLayers,
+    el,
+  } = useComponentAppearance('<SignInWithZevId>', appearance);
 
   return (
-    <Brandable branding={client.branding} className={className}>
+    <Brandable branding={branding} appearance={appearanceLayers} el={el} className={className}>
       <button
         type="button"
-        className="zv-button"
+        {...el(['button', variant === 'primary' ? 'buttonPrimary' : 'buttonSecondary', 'zevIdButton'])}
         data-variant={variant}
         data-shape={shape === 'default' ? undefined : shape}
         onClick={() => client.signIn.withZevId({ redirectUrl })}

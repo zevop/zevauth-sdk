@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
-import { useZevAuthContext } from '../internal/context.js';
+import { useComponentAppearance } from '../internal/context.js';
+import type { Appearance } from '../internal/appearance.js';
 import { useOrganizationList } from '../hooks/useOrganization.js';
 import { useDismiss } from '../internal/useDismiss.js';
 import { Brandable } from './Brandable.js';
@@ -8,6 +9,12 @@ import { Spinner } from './parts.js';
 export interface OrganizationSwitcherProps {
   /** Offer a way back to personal scope. Defaults to true. */
   allowPersonal?: boolean;
+  /**
+   * How this one component looks, merged over the provider's
+   * `appearance`. See `Appearance` for the console fields, `variables`
+   * and `elements`.
+   */
+  appearance?: Appearance;
   className?: string;
 }
 
@@ -23,9 +30,15 @@ export interface OrganizationSwitcherProps {
  */
 export function OrganizationSwitcher({
   allowPersonal = true,
+  appearance,
   className,
 }: OrganizationSwitcherProps) {
-  const { client, state } = useZevAuthContext('<OrganizationSwitcher>');
+  const {
+    state,
+    branding,
+    appearance: appearanceLayers,
+    el,
+  } = useComponentAppearance('<OrganizationSwitcher>', appearance);
   const { organizations, setActive } = useOrganizationList();
   const [isOpen, setIsOpen] = useState(false);
   const [switchingTo, setSwitchingTo] = useState<string | null>(null);
@@ -59,11 +72,11 @@ export function OrganizationSwitcher({
   }
 
   return (
-    <Brandable branding={client.branding} className={className}>
+    <Brandable branding={branding} appearance={appearanceLayers} el={el} className={className}>
       <div className="zv-menu-wrap" ref={wrapRef}>
         <button
           type="button"
-          className="zv-trigger"
+          {...el('menuTrigger')}
           onClick={() => setIsOpen((open) => !open)}
           aria-haspopup="menu"
           aria-expanded={isOpen}
@@ -72,13 +85,13 @@ export function OrganizationSwitcher({
         </button>
 
         {isOpen ? (
-          <div className="zv-menu" role="menu">
-            <div className="zv-menu-label">Switch to</div>
+          <div {...el('menu')} role="menu">
+            <div {...el('menuLabel')}>Switch to</div>
 
             {allowPersonal ? (
               <button
                 type="button"
-                className="zv-menu-item"
+                {...el('menuItem')}
                 role="menuitem"
                 aria-current={active === null}
                 disabled={switchingTo !== null}
@@ -93,7 +106,7 @@ export function OrganizationSwitcher({
               <button
                 key={organization.id}
                 type="button"
-                className="zv-menu-item"
+                {...el('menuItem')}
                 role="menuitem"
                 aria-current={active?.id === organization.id}
                 disabled={switchingTo !== null}

@@ -8,6 +8,15 @@ import {
 } from 'react';
 import type { Branding } from '@zevauth/js';
 import { ensureStyles } from '../internal/styles.js';
+import {
+  ElementsContext,
+  createElementResolver,
+  variablesToCss,
+  type ElementResolver,
+  type MergedAppearance,
+} from '../internal/appearance.js';
+
+const noElements = createElementResolver({});
 
 const RADIUS: Record<string, string> = {
   none: '0px',
@@ -62,18 +71,24 @@ function useIsDark(scheme: Branding['colorScheme'] | undefined): boolean {
  *
  * Every component renders inside one. It is what lets a single static
  * stylesheet paint any tenant's colour without generating CSS per
- * environment.
+ * environment, and it is where a developer's `appearance` lands: its
+ * `variables` as custom properties over the console's, and its
+ * `elements` resolver in context for the shared parts rendered inside.
  */
 export function Brandable({
   branding,
+  appearance,
+  el = noElements,
   className,
   children,
 }: {
   branding: Branding | null;
+  appearance?: MergedAppearance;
+  el?: ElementResolver;
   className?: string;
   children: ReactNode;
 }) {
-  ensureStyles();
+  ensureStyles(appearance?.cssLayerName);
 
   const isDark = useIsDark(branding?.colorScheme);
 
@@ -89,22 +104,42 @@ export function Brandable({
       : branding.accentOnLight
     : undefined;
 
+  const tokens = appearance ? variablesToCss(appearance.variables, isDark) : {};
+  /*
+   * A developer who sets `colorPrimary` and not the text on it still
+   * gets legible button text: the same rule as for the console accent,
+   * applied to their colour.
+   */
+  const primary = tokens['--zv-accent'] ?? accent;
+  const onPrimary =
+    tokens['--zv-on-accent'] ?? (primary ? readableOn(primary) : undefined);
+
   const style: CSSProperties & Record<string, string | undefined> = {
     '--zv-radius': RADIUS[branding?.borderRadius ?? 'medium'],
-    '--zv-font': FONT[branding?.fontFamily ?? 'system'],
+    /*
+     * Unknown names pass through as CSS, so an older console value or a
+     * plain-JavaScript `fontFamily: 'inherit'` still means something
+     * rather than falling back without a word.
+     */
+    '--zv-font': FONT[branding?.fontFamily ?? 'system'] ?? branding?.fontFamily,
     ...(accent ? { '--zv-accent': accent } : {}),
-    ...(accent ? { '--zv-on-accent': readableOn(accent) } : {}),
+    ...tokens,
+    ...(onPrimary ? { '--zv-on-accent': onPrimary } : {}),
   };
+
+  const root = el('root', style);
 
   return (
     <ZevThemeContext.Provider value={isDark}>
-    <div
-      className={className ? `zv-root ${className}` : 'zv-root'}
-      data-theme={isDark ? 'dark' : 'light'}
-      style={style}
-    >
-      {children}
-    </div>
+      <ElementsContext.Provider value={el}>
+        <div
+          className={className ? `${root.className} ${className}` : root.className}
+          data-theme={isDark ? 'dark' : 'light'}
+          style={root.style}
+        >
+          {children}
+        </div>
+      </ElementsContext.Provider>
     </ZevThemeContext.Provider>
   );
 }

@@ -1,11 +1,18 @@
 import { useCallback, useRef, useState } from 'react';
-import { useZevAuthContext } from '../internal/context.js';
+import { useComponentAppearance } from '../internal/context.js';
+import { useElements, type Appearance } from '../internal/appearance.js';
 import { useDismiss } from '../internal/useDismiss.js';
 import { Brandable } from './Brandable.js';
 
 export interface UserButtonProps {
   /** Where to send somebody after signing out. */
   afterSignOutUrl?: string;
+  /**
+   * How this one component looks, merged over the provider's
+   * `appearance`. See `Appearance` for the console fields, `variables`
+   * and `elements`.
+   */
+  appearance?: Appearance;
   className?: string;
 }
 
@@ -17,8 +24,14 @@ export interface UserButtonProps {
  * and two controls competing for the same slot is worse than one
  * appearing when it applies.
  */
-export function UserButton({ afterSignOutUrl, className }: UserButtonProps) {
-  const { client, state } = useZevAuthContext('<UserButton>');
+export function UserButton({ afterSignOutUrl, appearance, className }: UserButtonProps) {
+  const {
+    client,
+    state,
+    branding,
+    appearance: appearanceLayers,
+    el,
+  } = useComponentAppearance('<UserButton>', appearance);
   const [isOpen, setIsOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
 
@@ -35,11 +48,11 @@ export function UserButton({ afterSignOutUrl, className }: UserButtonProps) {
     'Account';
 
   return (
-    <Brandable branding={client.branding} className={className}>
+    <Brandable branding={branding} appearance={appearanceLayers} el={el} className={className}>
       <div className="zv-menu-wrap" ref={wrapRef}>
         <button
           type="button"
-          className="zv-trigger"
+          {...el('menuTrigger')}
           onClick={() => setIsOpen((open) => !open)}
           /* Both, so a screen reader announces a menu that opens and
              says whether it is open, rather than an unlabelled button. */
@@ -51,8 +64,8 @@ export function UserButton({ afterSignOutUrl, className }: UserButtonProps) {
         </button>
 
         {isOpen ? (
-          <div className="zv-menu" role="menu">
-            <div className="zv-menu-header">
+          <div {...el('menu')} role="menu">
+            <div {...el('menuHeader')}>
               <Avatar imageUrl={user.imageUrl} name={displayName} />
               <div>
                 <div className="zv-menu-name zv-truncate">{displayName}</div>
@@ -64,10 +77,10 @@ export function UserButton({ afterSignOutUrl, className }: UserButtonProps) {
 
             {state.organization ? (
               <>
-                <div className="zv-menu-label">Organization</div>
+                <div {...el('menuLabel')}>Organization</div>
                 <button
                   type="button"
-                  className="zv-menu-item"
+                  {...el('menuItem')}
                   role="menuitem"
                   /* Informational, not an action. Switching lives in
                      <OrganizationSwitcher>; a second place to do it
@@ -81,7 +94,7 @@ export function UserButton({ afterSignOutUrl, className }: UserButtonProps) {
 
             <button
               type="button"
-              className="zv-menu-item"
+              {...el('menuItem')}
               role="menuitem"
               onClick={() => {
                 close();
@@ -109,8 +122,9 @@ function Avatar({
   imageUrl: string | null;
   name: string;
 }) {
+  const el = useElements();
   return (
-    <span className="zv-avatar" aria-hidden="true">
+    <span {...el('avatar')} aria-hidden="true">
       {imageUrl ? <img src={imageUrl} alt="" /> : initials(name)}
     </span>
   );

@@ -1,12 +1,19 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { ZevAuthError } from '@zevauth/js';
 import type { OrganizationMember } from '@zevauth/js';
-import { useZevAuthContext } from '../internal/context.js';
+import { useComponentAppearance } from '../internal/context.js';
+import type { Appearance } from '../internal/appearance.js';
 import { Brandable } from './Brandable.js';
 import { Alert, Spinner } from './parts.js';
 import { ImageField } from './ImageField.js';
 
 export interface OrganizationProfileProps {
+  /**
+   * How this one component looks, merged over the provider's
+   * `appearance`. See `Appearance` for the console fields, `variables`
+   * and `elements`.
+   */
+  appearance?: Appearance;
   className?: string;
 }
 
@@ -24,8 +31,14 @@ export interface OrganizationProfileProps {
  * wrong for a few minutes costs an error message. Trusting it instead of
  * the server would cost a removal nobody was allowed to make.
  */
-export function OrganizationProfile({ className }: OrganizationProfileProps) {
-  const { client, state } = useZevAuthContext('<OrganizationProfile>');
+export function OrganizationProfile({ appearance, className }: OrganizationProfileProps) {
+  const {
+    client,
+    state,
+    branding,
+    appearance: appearanceLayers,
+    el,
+  } = useComponentAppearance('<OrganizationProfile>', appearance);
 
   const [members, setMembers] = useState<OrganizationMember[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -84,9 +97,9 @@ export function OrganizationProfile({ className }: OrganizationProfileProps) {
 
   if (!organization) {
     return (
-      <Brandable branding={client.branding} className={className}>
-        <div className="zv-card" data-size="wide">
-          <div className="zv-notice">
+      <Brandable branding={branding} appearance={appearanceLayers} el={el} className={className}>
+        <div {...el('card')} data-size="wide">
+          <div {...el('notice')}>
             This session is not acting as an organization. Switch to one to
             manage its members.
           </div>
@@ -115,16 +128,16 @@ export function OrganizationProfile({ className }: OrganizationProfileProps) {
   };
 
   return (
-    <Brandable branding={client.branding} className={className}>
-      <div className="zv-card" data-size="wide">
-        <h1 className="zv-title" style={{ textAlign: 'left' }}>
+    <Brandable branding={branding} appearance={appearanceLayers} el={el} className={className}>
+      <div {...el('card')} data-size="wide">
+        <h1 {...el('title', { textAlign: 'left' })}>
           {organization.name}
         </h1>
 
         {error ? <Alert>{error}</Alert> : null}
 
         {canManageOrg ? (
-          <div className="zv-fields">
+          <div {...el('fields')}>
             <ImageField
               label="Organization image"
               shape="square"
@@ -142,27 +155,27 @@ export function OrganizationProfile({ className }: OrganizationProfileProps) {
         ) : null}
 
         {canManage ? (
-          <form className="zv-fields" onSubmit={onAdd}>
-            <div className="zv-field">
-              <label className="zv-label" htmlFor="zv-invite">
+          <form {...el('fields')} onSubmit={onAdd}>
+            <div {...el('field')}>
+              <label {...el('label')} htmlFor="zv-invite">
                 Add a member
               </label>
               <input
                 id="zv-invite"
-                className="zv-input"
+                {...el('input')}
                 type="email"
                 value={inviteEmail}
                 onChange={(e) => setInviteEmail(e.target.value)}
                 disabled={isAdding}
                 placeholder="colleague@example.com"
               />
-              <span className="zv-hint">
+              <span {...el('hint')}>
                 They need an account here already.
               </span>
             </div>
             <button
               type="submit"
-              className="zv-button"
+              {...el(['button', 'buttonPrimary'])}
               data-variant="primary"
               disabled={isAdding || !inviteEmail}
             >
@@ -172,17 +185,18 @@ export function OrganizationProfile({ className }: OrganizationProfileProps) {
           </form>
         ) : null}
 
-        <div className="zv-fields">
-          <span className="zv-menu-label" style={{ padding: 0 }}>
+        <div {...el('fields')}>
+          <span {...el('menuLabel', { padding: 0 })}>
             Members
           </span>
 
           {isLoading ? (
-            <span className="zv-hint">Loading…</span>
+            <span {...el('hint')}>Loading…</span>
           ) : members.length === 0 ? (
-            <span className="zv-hint">Nobody yet.</span>
+            <span {...el('hint')}>Nobody yet.</span>
           ) : (
-            members.map((member) => {
+            <div {...el('memberList')}>
+            {members.map((member) => {
               const isSelf = member.userId === state.user?.id;
               const name =
                 [member.firstName, member.lastName].filter(Boolean).join(' ') ||
@@ -190,18 +204,9 @@ export function OrganizationProfile({ className }: OrganizationProfileProps) {
                 member.userId;
 
               return (
-                <div
-                  key={member.userId}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: 10,
-                    padding: '7px 0',
-                  }}
-                >
+                <div key={member.userId} {...el('memberRow')}>
                   <div style={{ minWidth: 0 }}>
-                    <div className="zv-truncate" style={{ fontSize: 13 }}>
+                    <div className="zv-member-name zv-truncate">
                       {name}
                       {isSelf ? ' (you)' : ''}
                     </div>
@@ -217,9 +222,8 @@ export function OrganizationProfile({ className }: OrganizationProfileProps) {
                   {canManage || isSelf ? (
                     <button
                       type="button"
-                      className="zv-button"
+                      {...el(['button', 'buttonSecondary'])}
                       data-variant="secondary"
-                      style={{ width: 'auto' }}
                       disabled={busyMember !== null}
                       onClick={() => {
                         setBusyMember(member.userId);
@@ -236,7 +240,8 @@ export function OrganizationProfile({ className }: OrganizationProfileProps) {
                   ) : null}
                 </div>
               );
-            })
+            })}
+            </div>
           )}
         </div>
       </div>

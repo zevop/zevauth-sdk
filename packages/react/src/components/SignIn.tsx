@@ -1,9 +1,7 @@
 import { useState, type FormEvent, type ReactNode } from 'react';
-import { ZevAuthError, type Appearance } from '@zevauth/js';
-import {
-  mergeAppearance,
-  useZevAuthContext,
-} from '../internal/context.js';
+import { ZevAuthError } from '@zevauth/js';
+import { useComponentAppearance } from '../internal/context.js';
+import type { Appearance } from '../internal/appearance.js';
 import { Brandable } from './Brandable.js';
 import {
   Alert,
@@ -102,7 +100,13 @@ export function SignIn({
   children,
   className,
 }: SignInProps) {
-  const { client, state, branding: contextBranding } = useZevAuthContext('<SignIn>');
+  const {
+    client,
+    state,
+    branding,
+    appearance: appearanceLayers,
+    el,
+  } = useComponentAppearance('<SignIn>', appearance);
 
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
@@ -126,14 +130,6 @@ export function SignIn({
   );
   const [isBusy, setIsBusy] = useState(false);
 
-  /*
-   * From context, not from the client: the provider has already
-   * merged any `appearance` over the server's values, and a component
-   * reading `client.branding` would quietly ignore it.
-   */
-  const branding = appearance
-    ? mergeAppearance(contextBranding, appearance)
-    : contextBranding;
   const methods = client.signInMethods;
 
   const hasPassword = methods.includes('email_password');
@@ -224,13 +220,13 @@ export function SignIn({
   };
 
   return (
-    <Brandable branding={branding} className={className}>
+    <Brandable branding={branding} appearance={appearanceLayers} el={el} className={className}>
       <Shell
         layout={resolvedLayout}
         align={branding?.contentAlign ?? 'center'}
         aside={aside ?? <BrandedAside branding={branding} />}
       >
-      <div className="zv-card" data-chrome={branding?.cardStyle ?? 'card'}>
+      <div {...el('card')} data-chrome={branding?.cardStyle ?? 'card'}>
         {client.isTestMode ? <TestModeBadge /> : null}
         <Identity branding={branding} />
 
@@ -243,7 +239,7 @@ export function SignIn({
             />
             {error ? <Alert>{error}</Alert> : null}
             <form
-              className="zv-fields"
+              {...el('fields')}
               onSubmit={(event) => {
                 event.preventDefault();
                 void run(async () => {
@@ -252,13 +248,13 @@ export function SignIn({
                 });
               }}
             >
-              <div className="zv-field">
-                <label className="zv-label" htmlFor="zv-reset-email">
+              <div {...el('field')}>
+                <label {...el('label')} htmlFor="zv-reset-email">
                   Email
                 </label>
                 <input
                   id="zv-reset-email"
-                  className="zv-input"
+                  {...el('input')}
                   type="email"
                   value={resetEmail}
                   onChange={(e) => setResetEmail(e.target.value)}
@@ -270,7 +266,7 @@ export function SignIn({
               </div>
               <button
                 type="submit"
-                className="zv-button"
+                {...el(['button', 'buttonPrimary'])}
                 data-variant="primary"
                 disabled={isBusy}
               >
@@ -279,7 +275,7 @@ export function SignIn({
             </form>
             <button
               type="button"
-              className="zv-button"
+              {...el(['button', 'buttonLink'])}
               data-variant="ghost"
               onClick={() => {
                 setError(null);
@@ -291,13 +287,13 @@ export function SignIn({
           </>
         ) : stage.name === 'link-sent' ? (
           <>
-            <h1 className="zv-title">Check your email</h1>
-            <p className="zv-subtitle">
+            <h1 {...el('title')}>Check your email</h1>
+            <p {...el('subtitle')}>
               If {stage.email} has an account, a sign-in link is on its way.
             </p>
             <button
               type="button"
-              className="zv-button"
+              {...el(['button', 'buttonLink'])}
               data-variant="ghost"
               onClick={() => setStage({ name: 'credentials' })}
             >
@@ -306,19 +302,19 @@ export function SignIn({
           </>
         ) : stage.name === 'code-sent' ? (
           <>
-            <h1 className="zv-title">Enter your code</h1>
-            <p className="zv-subtitle">
+            <h1 {...el('title')}>Enter your code</h1>
+            <p {...el('subtitle')}>
               If {stage.email} has an account, we sent it a code.
             </p>
             {error ? <Alert>{error}</Alert> : null}
-            <form className="zv-fields" onSubmit={onVerifyCode}>
-              <div className="zv-field">
-                <label className="zv-label" htmlFor="zv-code">
+            <form {...el('fields')} onSubmit={onVerifyCode}>
+              <div {...el('field')}>
+                <label {...el('label')} htmlFor="zv-code">
                   Code
                 </label>
                 <input
                   id="zv-code"
-                  className="zv-input"
+                  {...el('input')}
                   value={code}
                   onChange={(e) => setCode(e.target.value)}
                   disabled={isBusy}
@@ -331,7 +327,7 @@ export function SignIn({
               </div>
               <button
                 type="submit"
-                className="zv-button"
+                {...el(['button', 'buttonPrimary'])}
                 data-variant="primary"
                 disabled={isBusy || code.length === 0}
               >
@@ -341,7 +337,7 @@ export function SignIn({
             </form>
             <button
               type="button"
-              className="zv-button"
+              {...el(['button', 'buttonLink'])}
               data-variant="ghost"
               onClick={() => setStage({ name: 'credentials' })}
             >
@@ -361,7 +357,7 @@ export function SignIn({
               <>
                 <button
                   type="button"
-                  className="zv-button"
+                  {...el(['button', 'buttonSecondary', 'zevIdButton'])}
                   data-variant="secondary"
                   disabled={isBusy}
                   onClick={() => client.signIn.withZevId()}
@@ -383,14 +379,14 @@ export function SignIn({
             ) : null}
 
             {hasPassword ? (
-              <form className="zv-fields" onSubmit={onSubmitPassword}>
-                <div className="zv-field">
-                  <label className="zv-label" htmlFor="zv-identifier">
+              <form {...el('fields')} onSubmit={onSubmitPassword}>
+                <div {...el('field')}>
+                  <label {...el('label')} htmlFor="zv-identifier">
                     Email
                   </label>
                   <input
                     id="zv-identifier"
-                    className="zv-input"
+                    {...el('input')}
                     value={identifier}
                     onChange={(e) => setIdentifier(e.target.value)}
                     disabled={isBusy}
@@ -403,13 +399,13 @@ export function SignIn({
                     autoFocus
                   />
                 </div>
-                <div className="zv-field">
-                  <label className="zv-label" htmlFor="zv-password">
+                <div {...el('field')}>
+                  <label {...el('label')} htmlFor="zv-password">
                     Password
                   </label>
                   <input
                     id="zv-password"
-                    className="zv-input"
+                    {...el('input')}
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
@@ -419,7 +415,7 @@ export function SignIn({
                 </div>
                 <button
                   type="submit"
-                  className="zv-button"
+                  {...el(['button', 'buttonPrimary'])}
                   data-variant="primary"
                   disabled={isBusy || !identifier || !password}
                 >
@@ -443,7 +439,7 @@ export function SignIn({
               secondaryMethods === 'collapsed' ? (
                 <button
                   type="button"
-                  className="zv-more"
+                  {...el('moreToggle')}
                   aria-expanded={showMore}
                   onClick={() => setShowMore((open) => !open)}
                 >
@@ -467,14 +463,14 @@ export function SignIn({
             ) : null}
 
             {!hasPassword && (hasMagicLink || hasEmailCode) ? (
-              <div className="zv-fields">
-                <div className="zv-field">
-                  <label className="zv-label" htmlFor="zv-email">
+              <div {...el('fields')}>
+                <div {...el('field')}>
+                  <label {...el('label')} htmlFor="zv-email">
                     Email
                   </label>
                   <input
                     id="zv-email"
-                    className="zv-input"
+                    {...el('input')}
                     value={identifier}
                     onChange={(e) => setIdentifier(e.target.value)}
                     disabled={isBusy}
@@ -499,7 +495,7 @@ export function SignIn({
                   {zevIdIsSecondary ? (
                     <button
                       type="button"
-                      className="zv-button"
+                      {...el(['button', 'buttonSecondary', 'zevIdButton'])}
                       data-variant="secondary"
                       disabled={isBusy}
                       onClick={() => client.signIn.withZevId()}
@@ -511,7 +507,7 @@ export function SignIn({
                   {hasMagicLink ? (
                     <button
                       type="button"
-                      className="zv-button"
+                      {...el(['button', 'buttonSecondary'])}
                       data-variant="secondary"
                       disabled={isBusy || !identifier}
                       onClick={onSendLink}
@@ -523,7 +519,7 @@ export function SignIn({
                   {hasEmailCode ? (
                     <button
                       type="button"
-                      className="zv-button"
+                      {...el(['button', 'buttonSecondary'])}
                       data-variant="secondary"
                       disabled={isBusy || !identifier}
                       onClick={onSendCode}
@@ -536,7 +532,7 @@ export function SignIn({
             ) : null}
 
             {hasPassword ? (
-              <div className="zv-footer">
+              <div {...el('footer')}>
                 {/*
                   Enabled even with an empty field, and it says why when
                   it cannot act.
@@ -550,7 +546,7 @@ export function SignIn({
                 */}
                 <button
                   type="button"
-                  className="zv-button"
+                  {...el(['button', 'buttonLink'])}
                   data-variant="ghost"
                   disabled={isBusy}
                   onClick={() => {
@@ -588,7 +584,7 @@ export function SignIn({
                * mistake, and the person who can fix it is the developer
                * looking at this in their own app.
                */
-              <div className="zv-notice">
+              <div {...el('notice')}>
                 No sign-in methods are enabled for this environment. Turn one on
                 under Authentication in the ZevAuth console.
               </div>

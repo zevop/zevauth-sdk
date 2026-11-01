@@ -29,12 +29,18 @@ const STYLE_ID = 'zevauth-components';
 const AUTHORED = `
 .zv-root {
   --zv-radius: 8px;
-  --zv-bg: #ffffff;
+  /*
+   * Field and button text. Every other size is a multiple of it, so a
+   * developer who changes one value gets a component in proportion
+   * rather than 13.5px fields under a 22px heading.
+   */
+  --zv-font-size: 13.5px;
   --zv-surface: #ffffff;
   --zv-text: #18181b;
   --zv-muted: #71717a;
   --zv-border: #e4e4e7;
   --zv-field: #ffffff;
+  --zv-field-text: var(--zv-text);
   --zv-error: #b91c1c;
   --zv-accent: #18181b;
   --zv-on-accent: #ffffff;
@@ -85,30 +91,42 @@ const AUTHORED = `
   margin: 0;
   padding: 0;
 }
-.zv-root.zv-root .zv-title { color: var(--zv-text); font-size: 16.5px; font-weight: 600; }
-.zv-root.zv-root .zv-subtitle { color: var(--zv-muted); font-size: 13px; }
-.zv-root.zv-root .zv-appname { color: var(--zv-muted); font-size: 12.5px; }
-.zv-root.zv-root .zv-label { color: var(--zv-text); font-size: 12.5px; font-weight: 500; }
-.zv-root.zv-root .zv-hint { color: var(--zv-muted); font-size: 11.5px; }
-.zv-root.zv-root .zv-fielderror { color: var(--zv-error); font-size: 11.5px; }
-.zv-root.zv-root .zv-divider { color: var(--zv-muted); font-size: 11.5px; }
+.zv-root.zv-root .zv-title { color: var(--zv-text); font-size: calc(var(--zv-font-size) * 1.222); font-weight: 600; }
+.zv-root.zv-root .zv-subtitle { color: var(--zv-muted); font-size: calc(var(--zv-font-size) * 0.963); }
+.zv-root.zv-root .zv-appname { color: var(--zv-muted); font-size: calc(var(--zv-font-size) * 0.926); }
+.zv-root.zv-root .zv-label { color: var(--zv-text); font-size: calc(var(--zv-font-size) * 0.926); font-weight: 500; }
+.zv-root.zv-root .zv-hint { color: var(--zv-muted); font-size: calc(var(--zv-font-size) * 0.852); }
+.zv-root.zv-root .zv-fielderror { color: var(--zv-error); font-size: calc(var(--zv-font-size) * 0.852); }
+.zv-root.zv-root .zv-divider { color: var(--zv-muted); font-size: calc(var(--zv-font-size) * 0.852); }
 .zv-root.zv-root .zv-notice { color: var(--zv-muted); }
 .zv-root.zv-root .zv-alert { color: var(--zv-error); }
 .zv-root.zv-root .zv-testmode { color: var(--zv-muted); }
-.zv-root.zv-root .zv-menu-name { color: var(--zv-text); }
+.zv-root.zv-root .zv-menu-name,
+.zv-root.zv-root .zv-member-name { color: var(--zv-text); }
 .zv-root.zv-root .zv-menu-sub,
 .zv-root.zv-root .zv-menu-label { color: var(--zv-muted); }
 .zv-root.zv-root .zv-menu-item { color: var(--zv-text); }
-.zv-root.zv-root .zv-input { color: var(--zv-text); }
+.zv-root.zv-root .zv-input { color: var(--zv-field-text); }
 .zv-root.zv-root .zv-image-preview { color: var(--zv-muted); }
 .zv-root.zv-root .zv-button[data-variant='primary'] { color: var(--zv-on-accent); }
 .zv-root.zv-root .zv-button[data-variant='secondary'] { color: var(--zv-text); }
 .zv-root.zv-root .zv-button[data-variant='ghost'] { color: var(--zv-muted); }
+/*
+ * Focus is ours too. Every control below draws its own ring with a
+ * box-shadow, and most host pages also put a global outline on
+ * \`:focus-visible\` (design systems, Tailwind presets, our own docs).
+ * The plain \`outline: none\` on each control is too weak to beat those,
+ * so a focused field showed two rings, ours inside theirs with a gap
+ * between. Stated here at the isolation block's strength.
+ */
+.zv-root.zv-root :is(.zv-input, .zv-button, .zv-more, .zv-trigger, .zv-menu-item):focus-visible {
+  outline: none;
+}
 .zv-root.zv-root .zv-poweredby,
 .zv-root.zv-root .zv-poweredby strong {
   color: var(--zv-muted);
   text-decoration: none;
-  font-size: 11px;
+  font-size: calc(var(--zv-font-size) * 0.815);
 }
 .zv-root.zv-root .zv-poweredby strong { font-weight: 600; }
 
@@ -130,12 +148,20 @@ const AUTHORED = `
    * A fixed width does not depend on the parent at all, and
    * \`max-width: 100%\` still keeps it inside a narrow one.
    */
-  width: 380px;
+  width: var(--zv-card-width, 380px);
   max-width: 100%;
-  padding: 28px 26px;
+  /*
+   * Named so a part can reach the card's edge: the footer band in the
+   * \`soft\` theme pulls itself out by exactly the padding, and still
+   * lines up when a flat card sets it to zero.
+   */
+  --zv-card-px: 26px;
+  --zv-card-py: 28px;
+  padding: var(--zv-card-py) var(--zv-card-px);
   background: var(--zv-surface);
   border: 1px solid var(--zv-border);
   border-radius: calc(var(--zv-radius) * 1.5);
+  box-shadow: var(--zv-card-shadow, none);
 }
 
 /*
@@ -146,7 +172,7 @@ const AUTHORED = `
  * narrower, so the two silently disagreed and the wide screens rendered
  * at the narrow size.
  */
-.zv-card[data-size='wide'] { width: 460px; }
+.zv-card[data-size='wide'] { width: var(--zv-card-width, 460px); }
 
 /*
  * Blended into the page rather than drawn as a card.
@@ -162,7 +188,9 @@ const AUTHORED = `
 .zv-card[data-chrome='flat'] {
   background: transparent;
   border-color: transparent;
-  padding: 0;
+  box-shadow: none;
+  --zv-card-px: 0px;
+  --zv-card-py: 0px;
 }
 
 /*
@@ -257,7 +285,7 @@ const AUTHORED = `
 .zv-root.zv-root .zv-aside-heading {
   position: relative;
   margin: 0;
-  font-size: 23px;
+  font-size: calc(var(--zv-font-size) * 1.704);
   font-weight: 600;
   line-height: 1.25;
   letter-spacing: -0.015em;
@@ -266,7 +294,7 @@ const AUTHORED = `
 .zv-root.zv-root .zv-aside-text {
   position: relative;
   margin: 8px 0 0;
-  font-size: 13.5px;
+  font-size: var(--zv-font-size);
   line-height: 1.55;
   opacity: 0.88;
   color: inherit;
@@ -284,22 +312,27 @@ const AUTHORED = `
 
 .zv-identity { display: flex; flex-direction: column; align-items: center; gap: 8px; }
 .zv-logo { max-height: 30px; max-width: 170px; object-fit: contain; }
-.zv-appname { font-size: 12.5px; color: var(--zv-muted); }
-.zv-title { margin: 0; font-size: 16.5px; font-weight: 600; text-align: center; letter-spacing: -0.01em; }
-.zv-subtitle { margin: 0; font-size: 13px; line-height: 1.5; color: var(--zv-muted); text-align: center; }
+.zv-appname { font-size: calc(var(--zv-font-size) * 0.926); color: var(--zv-muted); }
+.zv-title { margin: 0; font-size: calc(var(--zv-font-size) * 1.222); font-weight: 600; text-align: center; letter-spacing: -0.01em; }
+.zv-subtitle { margin: 0; font-size: calc(var(--zv-font-size) * 0.963); line-height: 1.5; color: var(--zv-muted); text-align: center; }
 
 .zv-fields { display: flex; flex-direction: column; gap: 12px; }
 .zv-field { display: flex; flex-direction: column; gap: 5px; }
-.zv-label { font-size: 12.5px; font-weight: 500; }
+.zv-label { font-size: calc(var(--zv-font-size) * 0.926); font-weight: 500; }
 
 .zv-input {
   width: 100%;
   padding: 9px 11px;
   font: inherit;
-  font-size: 13.5px;
-  color: var(--zv-text);
+  font-size: var(--zv-font-size);
+  color: var(--zv-field-text);
   background: var(--zv-field);
-  border: 1px solid var(--zv-border);
+  /*
+   * Its own token rather than the shared border, so a theme can drop or
+   * darken field outlines while focus and \`aria-invalid\` below still
+   * repaint them. An inline style would have won over both states.
+   */
+  border: 1px solid var(--zv-field-border, var(--zv-border));
   border-radius: var(--zv-radius);
   outline: none;
   transition: border-color .12s ease, box-shadow .12s ease;
@@ -320,8 +353,8 @@ const AUTHORED = `
 .zv-input[aria-invalid='true'] { border-color: var(--zv-error); }
 .zv-input:disabled { opacity: .55; cursor: not-allowed; }
 
-.zv-hint { font-size: 11.5px; color: var(--zv-muted); }
-.zv-fielderror { font-size: 11.5px; color: var(--zv-error); }
+.zv-hint { font-size: calc(var(--zv-font-size) * 0.852); color: var(--zv-muted); }
+.zv-fielderror { font-size: calc(var(--zv-font-size) * 0.852); color: var(--zv-error); }
 
 /*
  * The picture row: a preview, then the actions beside it.
@@ -379,7 +412,7 @@ const AUTHORED = `
  */
 .zv-image-buttons .zv-button[data-shape='pill'] { border-radius: 999px; }
 .zv-button[data-shape='square'] { border-radius: 0; }
-.zv-button { width: auto; padding: 7px 12px; font-size: 12.5px; }
+.zv-image-buttons .zv-button { width: auto; padding: 7px 12px; font-size: calc(var(--zv-font-size) * 0.926); }
 
 .zv-progress {
   height: 4px;
@@ -402,7 +435,7 @@ const AUTHORED = `
   width: 100%;
   padding: 9px 14px;
   font: inherit;
-  font-size: 13.5px;
+  font-size: var(--zv-font-size);
   font-weight: 500;
   border-radius: var(--zv-radius);
   border: 1px solid transparent;
@@ -422,17 +455,17 @@ const AUTHORED = `
 .zv-button[data-variant='secondary']:hover:not(:disabled) { background: var(--zv-border); }
 .zv-button[data-variant='ghost'] {
   background: transparent; color: var(--zv-muted); border: 0; width: auto; padding: 4px 2px;
-  font-size: 12.5px; text-decoration: underline;
+  font-size: calc(var(--zv-font-size) * 0.926); text-decoration: underline;
 }
 
-.zv-divider { display: flex; align-items: center; gap: 10px; color: var(--zv-muted); font-size: 11.5px; }
+.zv-divider { display: flex; align-items: center; gap: 10px; color: var(--zv-muted); font-size: calc(var(--zv-font-size) * 0.852); }
 .zv-divider::before, .zv-divider::after {
   content: ''; flex: 1; height: 1px; background: var(--zv-border);
 }
 
 .zv-alert {
   padding: 9px 11px;
-  font-size: 12.5px;
+  font-size: calc(var(--zv-font-size) * 0.926);
   line-height: 1.45;
   border-radius: var(--zv-radius);
   border: 1px solid color-mix(in srgb, var(--zv-error) 35%, transparent);
@@ -441,22 +474,22 @@ const AUTHORED = `
 }
 
 .zv-notice {
-  padding: 9px 11px; font-size: 12.5px; line-height: 1.45;
+  padding: 9px 11px; font-size: calc(var(--zv-font-size) * 0.926); line-height: 1.45;
   border-radius: var(--zv-radius);
   border: 1px dashed var(--zv-border); color: var(--zv-muted);
 }
 
-.zv-footer { display: flex; justify-content: center; gap: 5px; font-size: 12.5px; color: var(--zv-muted); }
+.zv-footer { display: flex; justify-content: center; gap: 5px; font-size: calc(var(--zv-font-size) * 0.926); color: var(--zv-muted); }
 
 .zv-poweredby {
   display: flex; align-items: center; justify-content: center; gap: 5px;
-  font-size: 11px; color: var(--zv-muted); text-decoration: none;
+  font-size: calc(var(--zv-font-size) * 0.815); color: var(--zv-muted); text-decoration: none;
 }
 .zv-poweredby:hover { opacity: .8; }
 
 .zv-testmode {
   display: flex; align-items: center; justify-content: center; gap: 6px;
-  padding: 5px 9px; font-size: 11.5px; color: var(--zv-muted);
+  padding: 5px 9px; font-size: calc(var(--zv-font-size) * 0.852); color: var(--zv-muted);
   border: 1px dashed var(--zv-border); border-radius: var(--zv-radius);
 }
 .zv-dot { width: 6px; height: 6px; border-radius: 999px; background: currentColor; }
@@ -491,7 +524,7 @@ const AUTHORED = `
 
 .zv-more {
   display: flex; align-items: center; justify-content: center; gap: 6px;
-  width: 100%; padding: 6px; font: inherit; font-size: 12.5px;
+  width: 100%; padding: 6px; font: inherit; font-size: calc(var(--zv-font-size) * 0.926);
   color: var(--zv-muted); background: transparent; border: 0;
   cursor: pointer; border-radius: var(--zv-radius);
 }
@@ -506,12 +539,22 @@ const AUTHORED = `
   height: 1px; background: var(--zv-border); border: 0; margin: 2px 0;
 }
 
+/* ── Organization members ──────────────────────────────────────── */
+.zv-member-list { display: flex; flex-direction: column; }
+.zv-member {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 10px; padding: 7px 0;
+}
+.zv-member + .zv-member { border-top: 1px solid var(--zv-border); }
+.zv-member-name { font-size: calc(var(--zv-font-size) * 0.963); min-width: 0; }
+.zv-member .zv-button { width: auto; }
+
 /* ── Menus ─────────────────────────────────────────────────────── */
 .zv-menu-wrap { position: relative; display: inline-block; }
 
 .zv-trigger {
   display: inline-flex; align-items: center; gap: 8px;
-  padding: 4px 6px; font: inherit; font-size: 13px; color: var(--zv-text);
+  padding: 4px 6px; font: inherit; font-size: calc(var(--zv-font-size) * 0.963); color: var(--zv-text);
   background: transparent; border: 1px solid transparent;
   border-radius: var(--zv-radius); cursor: pointer;
 }
@@ -525,7 +568,7 @@ const AUTHORED = `
   width: 28px; height: 28px; flex: 0 0 28px;
   border-radius: 999px; overflow: hidden;
   background: var(--zv-accent); color: var(--zv-on-accent);
-  font-size: 11.5px; font-weight: 600; letter-spacing: .01em;
+  font-size: calc(var(--zv-font-size) * 0.852); font-weight: 600; letter-spacing: .01em;
 }
 .zv-avatar img { width: 100%; height: 100%; object-fit: cover; }
 
@@ -542,13 +585,13 @@ const AUTHORED = `
   display: flex; align-items: center; gap: 9px;
   padding: 8px 8px 10px; border-bottom: 1px solid var(--zv-border); margin-bottom: 4px;
 }
-.zv-menu-name { font-size: 13px; font-weight: 500; }
-.zv-menu-sub { font-size: 11.5px; color: var(--zv-muted); }
+.zv-menu-name { font-size: calc(var(--zv-font-size) * 0.963); font-weight: 500; }
+.zv-menu-sub { font-size: calc(var(--zv-font-size) * 0.852); color: var(--zv-muted); }
 .zv-truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 168px; }
 
 .zv-menu-item {
   display: flex; align-items: center; gap: 9px; width: 100%;
-  padding: 7px 8px; font: inherit; font-size: 13px; text-align: left;
+  padding: 7px 8px; font: inherit; font-size: calc(var(--zv-font-size) * 0.963); text-align: left;
   color: var(--zv-text); background: transparent; border: 0;
   border-radius: var(--zv-radius); cursor: pointer;
 }
@@ -559,7 +602,7 @@ const AUTHORED = `
 .zv-menu-item[aria-current='true'] { font-weight: 600; }
 .zv-menu-item:disabled { opacity: .6; cursor: default; }
 .zv-menu-label {
-  padding: 6px 8px 3px; font-size: 10.5px; text-transform: uppercase;
+  padding: 6px 8px 3px; font-size: calc(var(--zv-font-size) * 0.778); text-transform: uppercase;
   letter-spacing: .06em; color: var(--zv-muted);
 }
 
@@ -592,6 +635,29 @@ const CSS = AUTHORED.replace(/\/\*[\s\S]*?\*\//g, '')
   .replace(/\s+/g, ' ')
   .trim();
 
+/**
+ * The stylesheet, optionally inside a cascade layer.
+ *
+ * For server rendering with `cssLayerName`: the inlined `<style>` has
+ * to be the same layered CSS the runtime would add, or the page changes
+ * which rules win the moment it hydrates.
+ */
+export function getComponentStyles(options: { cssLayerName?: string } = {}): string {
+  const layer = options.cssLayerName?.trim();
+  if (!layer) return CSS;
+  /*
+   * A layer name is an identifier; anything else would let a stray
+   * brace from a config value close the block early and leave the rest
+   * of the stylesheet unlayered, which fails silently.
+   */
+  if (!/^[A-Za-z_][\w.-]*$/.test(layer)) {
+    throw new Error(
+      `cssLayerName "${layer}" is not a valid CSS layer name. Use letters, digits, "-", "_" or ".".`,
+    );
+  }
+  return `@layer ${layer}{${CSS}}`;
+}
+
 let injected = false;
 
 /**
@@ -600,8 +666,13 @@ let injected = false;
  * Guarded by an id as well as a module flag: two copies of the package
  * in one page — a real possibility with transitive dependencies — would
  * otherwise each inject their own, and the second would silently win.
+ *
+ * The layer is read on the first call only. The stylesheet is shared by
+ * every component on the page, so it cannot be in one layer for one
+ * component and another for the next; that is why `cssLayerName`
+ * belongs on the provider.
  */
-export function ensureStyles(): void {
+export function ensureStyles(cssLayerName?: string): void {
   if (injected) return;
   if (typeof document === 'undefined') return;
 
@@ -610,7 +681,7 @@ export function ensureStyles(): void {
 
   const style = document.createElement('style');
   style.id = STYLE_ID;
-  style.textContent = CSS;
+  style.textContent = getComponentStyles({ cssLayerName });
   document.head.appendChild(style);
 }
 

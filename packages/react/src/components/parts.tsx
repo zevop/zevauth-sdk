@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import type { Branding } from '@zevauth/js';
 import { useZevTheme } from './Brandable.js';
+import { useElements } from '../internal/appearance.js';
 
 /** The ZEV mark. The same paths every Zev product uses. */
 export function ZevMark({ size = 11 }: { size?: number }) {
@@ -25,6 +26,7 @@ export function ZevMark({ size = 11 }: { size?: number }) {
  * regardless: it is then the whole identity.
  */
 export function Identity({ branding }: { branding: Branding | null }) {
+  const el = useElements();
   if (!branding) return null;
 
   /*
@@ -47,10 +49,10 @@ export function Identity({ branding }: { branding: Branding | null }) {
   const showName = !branding.logoUrl || branding.showAppName;
 
   return (
-    <div className="zv-identity">
+    <div {...el('identity')}>
       {branding.logoUrl ? (
         <img
-          className="zv-logo"
+          {...el('logo')}
           src={branding.logoUrl}
           /* Decorative while the name is printed below it, or a screen
              reader announces the name twice. It carries the name only
@@ -58,14 +60,15 @@ export function Identity({ branding }: { branding: Branding | null }) {
           alt={showName ? '' : branding.appName}
         />
       ) : null}
-      {showName ? <span className="zv-appname">{branding.appName}</span> : null}
+      {showName ? <span {...el('appName')}>{branding.appName}</span> : null}
     </div>
   );
 }
 
 export function TestModeBadge() {
+  const el = useElements();
   return (
-    <div className="zv-testmode">
+    <div {...el('testModeBadge')}>
       <span className="zv-dot" />
       Test mode
     </div>
@@ -82,6 +85,7 @@ export function TestModeBadge() {
  * the developer's URL, which is theirs and not ours to forward.
  */
 export function PoweredBy({ environmentId }: { environmentId?: string | null }) {
+  const el = useElements();
   const url = new URL('https://www.zevauth.com');
   url.searchParams.set('utm_source', 'zevauth-sdk');
   url.searchParams.set('utm_medium', 'attribution');
@@ -91,7 +95,7 @@ export function PoweredBy({ environmentId }: { environmentId?: string | null }) 
 
   return (
     <a
-      className="zv-poweredby"
+      {...el('poweredBy')}
       href={url.toString()}
       target="_blank"
       rel="noopener noreferrer"
@@ -105,24 +109,27 @@ export function PoweredBy({ environmentId }: { environmentId?: string | null }) 
 }
 
 export function Alert({ children }: { children: ReactNode }) {
+  const el = useElements();
   /*
    * `role="alert"` so a failure is announced. A sign-in error that only
    * appears visually is invisible to somebody using a screen reader, who
    * is left wondering why the button did nothing.
    */
   return (
-    <div className="zv-alert" role="alert">
+    <div {...el('alert')} role="alert">
       {children}
     </div>
   );
 }
 
 export function Divider({ label }: { label: string }) {
-  return <div className="zv-divider">{label}</div>;
+  const el = useElements();
+  return <div {...el('divider')}>{label}</div>;
 }
 
 export function Spinner() {
-  return <span className="zv-spinner" aria-hidden="true" />;
+  const el = useElements();
+  return <span {...el('spinner')} aria-hidden="true" />;
 }
 
 /**
@@ -148,11 +155,12 @@ export function Heading({
   subtitle: string | null | undefined;
   fallbackTitle: string;
 }) {
+  const el = useElements();
   const heading = title === undefined ? fallbackTitle : title;
   return (
     <>
-      {heading ? <h1 className="zv-title">{heading}</h1> : null}
-      {subtitle ? <p className="zv-subtitle">{subtitle}</p> : null}
+      {heading ? <h1 {...el('title')}>{heading}</h1> : null}
+      {subtitle ? <p {...el('subtitle')}>{subtitle}</p> : null}
     </>
   );
 }
@@ -192,12 +200,13 @@ export function Shell({
   aside: ReactNode;
   children: ReactNode;
 }) {
+  const el = useElements();
   if (layout === 'centered') return <>{children}</>;
 
   return (
-    <div className="zv-split" data-form={layout === 'split-left' ? 'left' : 'right'}>
-      <div className="zv-aside">{aside}</div>
-      <div className="zv-formpane" data-align={align}>
+    <div {...el('splitLayout')} data-form={layout === 'split-left' ? 'left' : 'right'}>
+      <div {...el('aside')}>{aside}</div>
+      <div {...el('formPane')} data-align={align}>
         {children}
       </div>
     </div>
@@ -216,6 +225,7 @@ export function BrandedAside({ branding }: { branding: Branding | null }) {
    * them on every render, and `branding` is null on the first one.
    */
   const isDark = useZevTheme();
+  const el = useElements();
 
   if (!branding) return null;
   const { asideStyle, asideHeading, asideText } = branding;
@@ -263,8 +273,8 @@ export function BrandedAside({ branding }: { branding: Branding | null }) {
       ) : null}
       {asideHeading || asideText ? (
         <div className="zv-aside-body" data-scrim={usesImage ? 'true' : 'false'}>
-          {asideHeading ? <p className="zv-aside-heading">{asideHeading}</p> : null}
-          {asideText ? <p className="zv-aside-text">{asideText}</p> : null}
+          {asideHeading ? <p {...el('asideHeading')}>{asideHeading}</p> : null}
+          {asideText ? <p {...el('asideText')}>{asideText}</p> : null}
         </div>
       ) : null}
     </div>
