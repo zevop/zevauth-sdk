@@ -32,7 +32,9 @@ if [ ${#PKGS[@]} -gt 0 ]; then
   PLAN_ARGS+=(--packages "$(IFS=,; echo "${PKGS[*]}")")
 fi
 
-node scripts/release-ci.mjs plan "${PLAN_ARGS[@]}" "${DRY[@]}"
+# `${DRY[@]+"${DRY[@]}"}`, not `"${DRY[@]}"`: macOS ships bash 3.2, where
+# an empty array counts as unset under `set -u` and the script stops.
+node scripts/release-ci.mjs plan "${PLAN_ARGS[@]}" ${DRY[@]+"${DRY[@]}"}
 
 if [ "$(node -p "require('./.release-plan.json').releases.length")" = "0" ]; then
   exit 0

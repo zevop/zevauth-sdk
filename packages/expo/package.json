@@ -1,6 +1,6 @@
 {
   "name": "@zevauth/expo",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "ZevAuth for Expo and React Native: hooks and native sign-in components.",
   "keywords": [
     "zevauth",
