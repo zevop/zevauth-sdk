@@ -83,4 +83,4 @@ public issue.
 
 ## License
 
-[MIT](LICENSE). Copyright (c) 2026 ZevOp Inc.
+[MIT](LICENSE). Copyright (c) 2026 Zevop Inc.
