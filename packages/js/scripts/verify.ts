@@ -373,6 +373,43 @@ async function main() {
     check('a signed-out visitor costs the server no request', posts.length === count);
   }
 
+  {
+    /*
+     * A returning session's refresh must not wait behind the
+     * environment fetch: with a slow environment answer, the refresh
+     * request is already out before it resolves.
+     */
+    const api = fakeApi();
+    const storage = memoryStorage();
+    const first = makeClient(api, storage);
+    await first.client.load();
+    await first.client.signIn.withPassword({ identifier: 'a@example.com', password: 'hunter2hunter2' });
+
+    let releaseEnvironment: () => void = () => {};
+    const gate = new Promise<void>((resolve) => (releaseEnvironment = resolve));
+    const order: string[] = [];
+    const slowEnvironment = (async (url: string, init?: RequestInit) => {
+      const path = new URL(url).pathname;
+      order.push(`start ${path}`);
+      if (path === '/v1/environment') await gate;
+      const res = await api.fetch(url, init);
+      order.push(`done ${path}`);
+      return res;
+    }) as typeof fetch;
+    const second = new ZevAuth({ publishableKey: 'pk_test_abc', apiUrl: 'https://api.test', fetch: slowEnvironment, storage });
+    const loading = second.load();
+    await new Promise((r) => setTimeout(r, 20));
+    check(
+      'the session restores while the environment is still loading',
+      order.includes('done /v1/auth/refresh') && !order.includes('done /v1/environment'),
+      order.join(', '),
+    );
+    check('and load() still waits for the environment', second.isLoaded === false);
+    releaseEnvironment();
+    await loading;
+    check('then finishes with both', second.isLoaded && second.user !== null && second.isTestMode === true);
+  }
+
   console.log('\n\x1b[1mSign in and session\x1b[0m');
 
   {

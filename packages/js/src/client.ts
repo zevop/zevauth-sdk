@@ -237,7 +237,22 @@ export class ZevAuth {
     // memory first. A no-op on the web.
     if (this.mirror) await this.mirror.preload(this.storageKeys);
 
-    this.environment = await this.http.get<EnvironmentConfig>('/v1/environment');
+    /*
+     * The environment and the session load side by side, not one after
+     * the other. Completing a sign-in (the handoff exchange, an email
+     * link, a refresh) needs only the key, never the environment, and
+     * waiting for it first put a whole extra round trip, about a second
+     * for users far from the API, in front of every sign-in return.
+     * The no-op catch keeps a failed environment fetch from surfacing as
+     * an unhandled rejection while the session steps run; `await` below
+     * still rejects the load with it.
+     */
+    const environment = this.http
+      .get<EnvironmentConfig>('/v1/environment')
+      .then((config) => {
+        this.environment = config;
+      });
+    environment.catch(() => undefined);
 
     await this.completeHandoffIfPresent();
     await this.completeEmailLinkIfPresent();
@@ -247,6 +262,8 @@ export class ZevAuth {
       // on a fresh page load.
       await this.restore();
     }
+
+    await environment;
 
     this.loaded = true;
     this.emit();
