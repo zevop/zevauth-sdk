@@ -100,6 +100,11 @@ export interface Branding {
   signInLayout?: 'centered' | 'split_left' | 'split_right';
   /** `flat` drops the border, surface and padding so the form blends in. */
   cardStyle?: 'card' | 'flat';
+  /**
+   * A centered card takes the whole screen and sits in the middle of
+   * it. Off, your own page places it. `<SignIn fullPage />` overrides it.
+   */
+  signInFullPage?: boolean;
   /** Where the form sits vertically in the space it is given. */
   contentAlign?: 'center' | 'top';
   /** `dedicated` gives the password reset its own screen and its own field. */

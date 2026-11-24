@@ -177,7 +177,7 @@ export function SignUp({
     <Brandable branding={branding} appearance={appearanceLayers} el={el} strings={strings} className={className}>
       <Shell
         layout={resolvedLayout}
-        fullPage={fullPage}
+        fullPage={fullPage ?? branding?.signInFullPage ?? false}
         align={branding?.contentAlign ?? 'center'}
         aside={aside ?? <BrandedAside branding={branding} />}
       >
