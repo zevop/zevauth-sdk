@@ -1,6 +1,6 @@
 {
   "name": "@zevauth/js",
-  "version": "0.2.9",
+  "version": "0.2.11",
   "description": "ZevAuth for the browser. Framework agnostic.",
   "keywords": [
     "zevauth",
