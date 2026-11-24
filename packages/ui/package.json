@@ -57,6 +57,12 @@
     "@zevauth/js": "^0.2.7",
     "@zevauth/react": "^0.2.7"
   },
+  "zevauth": {
+    "bundles": [
+      "@zevauth/js",
+      "@zevauth/react"
+    ]
+  },
   "devDependencies": {
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",

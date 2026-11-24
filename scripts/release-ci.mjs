@@ -193,6 +193,20 @@ function plan() {
           moved = true;
         }
       }
+      /*
+       * A package that ships another inside its own bundle (`@zevauth/ui`
+       * carries the React components in its script-tag build) has to be
+       * released with it. Its range still accepts the new version, so
+       * the rule above never fires, and people on the CDN build stayed
+       * on old components after a fix. Declared in that package.json as
+       * `"zevauth": { "bundles": [...] }`.
+       */
+      for (const dep of ws.json.zevauth?.bundles ?? []) {
+        if (!next.has(dep) || next.has(ws.name)) continue;
+        next.set(ws.name, bumpVersion(ws.json.version, 'patch'));
+        reasons.set(ws.name, `bundles ${dep}`);
+        moved = true;
+      }
     }
   }
 
