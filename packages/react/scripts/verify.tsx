@@ -88,6 +88,7 @@ function clientIn(state: {
   secondFactor?: { factors: string[]; expiresAt: string } | null;
   pendingTasks?: string[];
   mfaSettings?: { policy: 'off' | 'optional' | 'required'; factors: string[]; rememberDeviceDays: number } | null;
+  signUpFields?: { firstName: 'off' | 'optional' | 'required'; lastName: 'off' | 'optional' | 'required' } | null;
 }): ZevAuth {
   const client = createZevAuth({
     publishableKey: 'pk_test_x',
@@ -120,6 +121,7 @@ function clientIn(state: {
   Object.defineProperty(client, 'secondFactor', { get: () => state.secondFactor ?? null });
   Object.defineProperty(client, 'pendingTasks', { get: () => state.pendingTasks ?? [] });
   Object.defineProperty(client, 'mfaSettings', { get: () => state.mfaSettings ?? null });
+  Object.defineProperty(client, 'signUpFields', { get: () => state.signUpFields ?? null });
   Object.defineProperty(client, 'isTestMode', {
     get: () => state.isTestMode ?? false,
   });
@@ -777,6 +779,42 @@ console.log('\n\x1b[1mSplit sign-in screens\x1b[0m');
     <SignUp />,
   );
   check('sign-up takes the same layout', signUpSplit.includes('data-form="left"'), signUpSplit.slice(0, 160));
+
+  // A centered card is placed by the host page unless asked otherwise.
+  const placedByPage = render(clientIn(base), <SignIn />);
+  check('a centered card is left for the page to place', !placedByPage.includes('data-page'));
+  const fullPage = render(clientIn(base), <SignIn fullPage />);
+  check('fullPage centres it on the screen', fullPage.includes('zv-formpane') && fullPage.includes('data-page'));
+  const fullPageSignUp = render(clientIn(base), <SignUp fullPage />);
+  check('sign-up takes fullPage too', fullPageSignUp.includes('data-page'));
+  const splitFullPage = render(
+    clientIn({ ...base, branding: { signInLayout: 'split_left' } }),
+    <SignIn fullPage />,
+  );
+  check('fullPage changes nothing on a split screen', !splitFullPage.includes('data-page') && splitFullPage.includes('data-form="left"'));
+
+  // The name fields come from the console, not from this form.
+  const passwordOnly = { loaded: true, user: null, methods: ['email_password'] };
+  const legacyNames = render(clientIn(passwordOnly), <SignUp />);
+  check(
+    'an API without the setting keeps the optional first name',
+    legacyNames.includes('id="zv-firstname"') && legacyNames.includes('Optional.') && !legacyNames.includes('id="zv-lastname"'),
+  );
+  const requiredNames = render(
+    clientIn({ ...passwordOnly, signUpFields: { firstName: 'required', lastName: 'required' } }),
+    <SignUp />,
+  );
+  check(
+    'required names are both drawn and marked required',
+    /id="zv-firstname"[^>]*required/.test(requiredNames) && /id="zv-lastname"[^>]*required/.test(requiredNames),
+    requiredNames.slice(0, 200),
+  );
+  check('and are not called optional', !requiredNames.includes('Optional.'));
+  const noNames = render(
+    clientIn({ ...passwordOnly, signUpFields: { firstName: 'off', lastName: 'off' } }),
+    <SignUp />,
+  );
+  check('names turned off are not asked for', !noNames.includes('zv-firstname') && !noNames.includes('zv-lastname'));
 
   // The reset and code screens are stages of <SignIn>, inside the same
   // shell, so they inherit the split rather than dropping to a card.

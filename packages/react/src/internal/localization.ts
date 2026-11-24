@@ -56,6 +56,7 @@ export const en = {
     title: 'Create your account',
     submit: 'Create account',
     firstName: 'First name',
+    lastName: 'Last name',
     optional: 'Optional.',
     passwordHint: '8 characters or more.',
     confirmPassword: 'Confirm password',

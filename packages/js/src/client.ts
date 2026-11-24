@@ -28,6 +28,7 @@ import {
   type Branding,
   type ActiveOrganization,
   type EnvironmentConfig,
+  type SignUpFields,
   type OrganizationSettings,
   type MfaSettings,
   type SecondFactorChallenge,
@@ -305,6 +306,15 @@ export class ZevAuth {
    */
   get emailVerification(): EnvironmentConfig['emailVerification'] {
     return this.environment?.emailVerification;
+  }
+
+  /**
+   * Which name fields sign-up asks for, or null from an API older than
+   * the setting. The server enforces it regardless; this is for drawing
+   * the fields it will ask for.
+   */
+  get signUpFields(): SignUpFields | null {
+    return this.environment?.signUp ?? null;
   }
 
   /**

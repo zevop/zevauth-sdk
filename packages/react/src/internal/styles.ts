@@ -210,6 +210,12 @@ const AUTHORED = `
 .zv-formpane[data-align='top'] { align-items: flex-start; }
 
 /*
+ * A centered card that owns the page (\`fullPage\`). The same pane the
+ * split screen uses, without the other half.
+ */
+.zv-formpane[data-page] { width: 100%; min-height: 100dvh; box-sizing: border-box; }
+
+/*
  * The split screen: form on one side, a picture on the other.
  *
  * \`data-form\` names where the FORM goes, because that is the thing a

@@ -194,17 +194,32 @@ export type SignInLayout = 'centered' | 'split-left' | 'split-right';
  */
 export function Shell({
   layout,
+  fullPage = false,
   align = 'center',
   aside,
   children,
 }: {
   layout: SignInLayout;
+  /** Centered only: take the whole screen and put the card in the middle. */
+  fullPage?: boolean;
   align?: 'center' | 'top';
   aside: ReactNode;
   children: ReactNode;
 }) {
   const el = useElements();
-  if (layout === 'centered') return <>{children}</>;
+  if (layout === 'centered') {
+    /*
+     * Opt-in, because the card has always sat wherever the developer's
+     * own element put it, and pages are built around that. Taking the
+     * screen by default would push those cards a screen-height apart.
+     */
+    if (!fullPage) return <>{children}</>;
+    return (
+      <div {...el('formPane')} data-page="" data-align={align}>
+        {children}
+      </div>
+    );
+  }
 
   return (
     <div {...el('splitLayout')} data-form={layout === 'split-left' ? 'left' : 'right'}>

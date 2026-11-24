@@ -44,6 +44,17 @@ export interface SignInProps {
   layout?: SignInLayout;
 
   /**
+   * Centre a centered card on the whole screen.
+   *
+   * A centered card is otherwise placed by your page: it sits wherever
+   * the element you render it into sits, which suits a page that has
+   * its own header or column. Set this when the sign-in IS the page
+   * and you would rather not write the centring yourself. A split
+   * layout always fills the screen, so this changes nothing there.
+   */
+  fullPage?: boolean;
+
+  /**
    * What fills the other half of a split screen.
    *
    * Overrides the picture and copy set in the console: passing JSX is a
@@ -99,6 +110,7 @@ export function SignIn({
   afterSignInUrl,
   secondaryMethods = 'inline',
   layout,
+  fullPage,
   aside,
   appearance,
   localization,
@@ -257,6 +269,7 @@ export function SignIn({
     <Brandable branding={branding} appearance={appearanceLayers} el={el} strings={strings} className={className}>
       <Shell
         layout={resolvedLayout}
+        fullPage={fullPage}
         align={branding?.contentAlign ?? 'center'}
         aside={aside ?? <BrandedAside branding={branding} />}
       >

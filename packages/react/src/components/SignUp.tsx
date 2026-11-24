@@ -35,6 +35,9 @@ export interface SignUpProps {
   /** Where the form sits. Defaults to the console's setting, as sign-in does. */
   layout?: SignInLayout;
 
+  /** Centre a centered card on the whole screen. See `<SignIn fullPage>`. */
+  fullPage?: boolean;
+
   /** What fills the other half of a split screen. Overrides the console. */
   aside?: ReactNode;
 
@@ -63,6 +66,7 @@ export function SignUp({
   children,
   className,
   layout,
+  fullPage,
   aside,
   appearance,
   localization,
@@ -85,6 +89,7 @@ export function SignUp({
   const [confirmPassword, setConfirmPassword] = useState('');
   const [code, setCode] = useState('');
   const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isBusy, setIsBusy] = useState(false);
   const [awaitingVerification, setAwaitingVerification] = useState(false);
@@ -118,6 +123,17 @@ export function SignUp({
     (client.emailVerification?.strategies?.includes('link') ??
       false) || (client.emailVerification?.strategies?.length ?? 0) === 0;
 
+  /*
+   * The name fields the console asks for. An API older than the setting
+   * says nothing, and gets what this form always drew: an optional
+   * first name and no last name.
+   */
+  const firstNameMode = client.signUpFields?.firstName ?? 'optional';
+  const lastNameMode = client.signUpFields?.lastName ?? 'off';
+  const missingName =
+    (firstNameMode === 'required' && !firstName.trim()) ||
+    (lastNameMode === 'required' && !lastName.trim());
+
   const hasPassword = client.signInMethods.includes('email_password');
   const hasZevId = client.signInMethods.includes('zevid');
 
@@ -137,7 +153,8 @@ export function SignUp({
       .create({
         email,
         password,
-        firstName: firstName || undefined,
+        firstName: (firstNameMode !== 'off' && firstName.trim()) || undefined,
+        lastName: (lastNameMode !== 'off' && lastName.trim()) || undefined,
       })
       .then((result) => {
         // No session and a verification requirement means the server
@@ -160,6 +177,7 @@ export function SignUp({
     <Brandable branding={branding} appearance={appearanceLayers} el={el} strings={strings} className={className}>
       <Shell
         layout={resolvedLayout}
+        fullPage={fullPage}
         align={branding?.contentAlign ?? 'center'}
         aside={aside ?? <BrandedAside branding={branding} />}
       >
@@ -286,20 +304,52 @@ export function SignUp({
 
             {hasPassword ? (
               <form {...el('fields')} onSubmit={onSubmit}>
-                <div {...el('field')}>
-                  <label {...el('label')} htmlFor="zv-firstname">
-                    {t.firstName}
-                  </label>
-                  <input
-                    id="zv-firstname"
-                    {...el('input')}
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
-                    disabled={isBusy}
-                    autoComplete="given-name"
-                  />
-                  <span {...el('hint')}>{t.optional}</span>
-                </div>
+                {/*
+                  Off, optional or required, from the console. A field
+                  the server will refuse without is marked required
+                  here, so the browser says so before the request does.
+                */}
+                {firstNameMode !== 'off' ? (
+                  <div {...el('field')}>
+                    <label {...el('label')} htmlFor="zv-firstname">
+                      {t.firstName}
+                    </label>
+                    <input
+                      id="zv-firstname"
+                      {...el('input')}
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                      disabled={isBusy}
+                      autoComplete="given-name"
+                      maxLength={100}
+                      required={firstNameMode === 'required'}
+                    />
+                    {firstNameMode === 'optional' ? (
+                      <span {...el('hint')}>{t.optional}</span>
+                    ) : null}
+                  </div>
+                ) : null}
+
+                {lastNameMode !== 'off' ? (
+                  <div {...el('field')}>
+                    <label {...el('label')} htmlFor="zv-lastname">
+                      {t.lastName}
+                    </label>
+                    <input
+                      id="zv-lastname"
+                      {...el('input')}
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                      disabled={isBusy}
+                      autoComplete="family-name"
+                      maxLength={100}
+                      required={lastNameMode === 'required'}
+                    />
+                    {lastNameMode === 'optional' ? (
+                      <span {...el('hint')}>{t.optional}</span>
+                    ) : null}
+                  </div>
+                ) : null}
 
                 <div {...el('field')}>
                   <label {...el('label')} htmlFor="zv-signup-email">
@@ -378,7 +428,7 @@ export function SignUp({
                   {...el(['button', 'buttonPrimary'])}
                   data-variant="primary"
                   disabled={
-                    isBusy || !email || password.length < 8 || mismatch ||
+                    isBusy || !email || missingName || password.length < 8 || mismatch ||
                     (requireConfirmPassword && confirmPassword.length === 0)
                   }
                 >

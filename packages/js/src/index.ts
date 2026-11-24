@@ -19,6 +19,8 @@ export {
   type ActiveOrganization,
   type Branding,
   type EnvironmentConfig,
+  type SignUpFields,
+  type SignUpFieldMode,
   type OrganizationSettings,
   type MfaSettings,
   type SecondFactorChallenge,

@@ -152,6 +152,14 @@ export interface OrganizationSettings {
   maxPerUser: number | null;
 }
 
+/** `off` hides the field, `optional` shows it, `required` refuses sign-up without it. */
+export type SignUpFieldMode = 'off' | 'optional' | 'required';
+
+export interface SignUpFields {
+  firstName: SignUpFieldMode;
+  lastName: SignUpFieldMode;
+}
+
 export interface EnvironmentConfig {
   id: string;
   kind: 'test' | 'live';
@@ -171,6 +179,13 @@ export interface EnvironmentConfig {
 
   /** Two-step verification policy. Absent from APIs older than this field. */
   mfa?: MfaSettings;
+
+  /**
+   * Which name fields sign-up asks for, set in the console under
+   * Authentication → Personal information. Absent from APIs older than
+   * this field.
+   */
+  signUp?: SignUpFields;
 
   emailVerification?: {
     /** `at_signup` sends immediately; `later` waits for you; `never` skips it. */
